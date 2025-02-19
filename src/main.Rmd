@@ -30,6 +30,9 @@ str(simple)
 
 simple = left_join(simple,donationdata$donor[,c('releaseID','DateOfBirth','Sex','BloodGroup')],by='releaseID')
 simple$age= as.numeric(difftime(simple$DonationDate,simple$DateOfBirth),unit="weeks")/52.25
+simple$month = as.factor(month(simple$DonationDate))
+simple$year = year(simple$DonationDate)
+simple$year.factor = as.factor(simple$year)
 
 date0 = simple %>%
   group_by(releaseID) %>%
@@ -38,12 +41,73 @@ date0 = simple %>%
 donation0 = simple %>%
   inner_join(date0,join_by(x$DonationDate==y$date0,releaseID))
 
-donation.r = simple[1:10] %>%
-  left_join(date0,join_by(x$DonationDate==y$date0,releaseID))
+# repeat donations
+donation.r = simple %>%
+  left_join(cbind(date0,sent=1),join_by(x$DonationDate==y$date0,releaseID)) %>%
+  filter(is.na(sent)) %>%
+  select(-sent)
+
+# mr=lm(Hb~0+month,data=donation.r)
+# summary(mr) # Nämä olisi varmaankin saanut myös suoraan keskiarvoina
+
+seasonal = donation.r %>%
+  group_by(month) %>%
+  summarise(seasonal=mean(Hb,na.rm=TRUE),.groups='drop')
+
+donation.r = inner_join(donation.r,seasonal,join_by(month))
+
+m=lm(0+Hb~age+Sex+seasonal+year.factor:Sex,data=donation.r[donation.r$year>=2005,])
+sm=summary(m)
+r.mat=plotYearSex(m)
+str(r.mat)
+adjustment=pivot_longer(cbind(Sex=rownames(r.mat)[1:2],r.mat[1:2,]),colnames(r.mat),names_to='year') # ,names_to='Sex',values_to='value')
+adjustment$year=as.integer(adjustment$year)
+
+str(seasonal)
+seasonal$month=as.integer(seasonal$month)
+str(adjustment)
+str(donation0)
+
+# donation0$year=year(donation0$DonationDate)
+# donation0$year.factor=as.factor(donation0$year)
+
+str(donation0)
+donation0a = donation0 %>%
+  inner_join(seasonal,join_by(month)) %>%
+  inner_join(adjustment,join_by(Sex,year)) %>%
+  mutate(Hb.adj = Hb + value)
+
+m=lm(Hb.adj~0+age+year.factor:Sex+month,data=donation0a[donation0a$year>=2005,])
+sm=summary(m)
+sm
+final=plotYearSex(m)
+apply(final,1,min)
+apply(final,1,max)
+
+final.longer = matToLonger(final)
+final.longer
+final.longer$interceptFemale=1
+final.longer$interceptFemale[final.longer$Sex=='Male']=0
+final.longer$interceptMale=1-final.longer$interceptFemale
+m=lm(value~0+interceptFemale+interceptMale+year:Sex,data=final.longer)
+sm=summary(m)
+sm
+str(final.longer)
+
+matToLonger = function(mat) {
+  df1=as.data.frame(pivot_longer(cbind(Sex=rownames(mat)[1:2],mat[1:2,]),colnames(mat),names_to='year'))
+  df1$year=as.integer(df1$year)
+  return(df1)
+}
+```
+
+
+```{r}
+# annual = cbind(t(r.mat["Male",]),t(r.mat["Female",]))
 
 donation0$year=year(donation0$DonationDate)
 
-donation0$year.factor = as.factor(donation0$year)
+# donation0$year.factor = as.factor(donation0$year)
 str(donation0$year.factor)
 
 # Regressiomalleja
@@ -60,28 +124,32 @@ summary(m)
 sm=summary(m)
 # plot(sm$coeff[4:nrow(sm$co),1])
 
-cofs = sm$coeff
-conames=rownames(sm$coeff)
-codf=data.frame(name=conames,estimate=cofs[,1])
-wh=grep('(Male|Female):',conames)
-codf$Sex[wh]=sub('.*(Male|Female).*','\\1',conames[wh])
-codf$year[wh]=sub('[^0-9]+([0-9]+).*','\\1',conames[wh])
-codf=cbind(codf,confint(m))
-
-
-codf=codf[!is.na(codf$Sex),]
-pah=pivot_wider(codf,names_from='year',values_from='estimate',id_cols=c('Sex'))
-pah=as.data.frame(pah[,-1])
-str(pah)
-pah2=pivot_wider(codf,names_from='year',values_from='2.5 %',id_cols=c('Sex'))
-pah2=as.data.frame(pah2[,-1])
-pah3=pivot_wider(codf,names_from='year',values_from='97.5 %',id_cols=c('Sex'))
-pah3=as.data.frame(pah3[,-1])
-
-pah.all=rbind(pah,pah2,pah3)
-str(pah.all) 
-
-matplot(t(pah.all),type='l',lty=c(rep('solid',2),rep('dashed',4)),col=rep(c('red','blue'),2))
+plotYearSex = function(m) {
+  cofs = summary(m)$coeff
+  conames=rownames(cofs)
+  codf=data.frame(name=conames,estimate=cofs[,1])
+  wh=grep('(Male|Female)',conames)
+  codf$Sex[wh]=sub('.*(Male|Female).*','\\1',conames[wh])
+  codf$year[wh]=sub('[^0-9]+([0-9]+).*','\\1',conames[wh])
+  codf=cbind(codf,confint(m))
+  
+  codf=codf[!is.na(codf$Sex),]
+  pah=pivot_wider(codf,names_from='year',values_from='estimate',id_cols=c('Sex'))
+  rn = as.vector(pah[,1])
+  pah=as.data.frame(pah[,-1])
+  rownames(pah)=rn$Sex
+  pah2=pivot_wider(codf,names_from='year',values_from='2.5 %',id_cols=c('Sex'))
+  pah2=as.data.frame(pah2[,-1])
+  pah3=pivot_wider(codf,names_from='year',values_from='97.5 %',id_cols=c('Sex'))
+  pah3=as.data.frame(pah3[,-1])
+  
+  pah.all=rbind(pah,pah2,pah3)
+  
+  matplot(t(pah.all),type='l',lty=c(rep('solid',2),rep('dashed',4)),col=rep(c('red','blue'),2),axes=FALSE)
+  axis(2)
+  axis(side=1,at=1:ncol(pah.all),labels=colnames(pah.all))
+  return(pah.all)
+}
 cofs
 m=lm(Hb~year,data=donation0)
 summary(m)
