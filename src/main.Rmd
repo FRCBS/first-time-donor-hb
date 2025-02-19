@@ -1,0 +1,156 @@
+---
+title: "hb trends"
+author: "Timo Asikainen"
+date: "2025-02-17"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+load('C:/git_repot/DATA/donationdata.fortimo.rdata')
+```
+
+```{r}
+library(dplyr)
+library(lubridate)
+library(tidyr)
+```
+
+
+```{r}
+simple = donationdata$donation
+wh = which(simple$Hb==50)
+simple[wh,]
+
+str(simple)
+
+simple = left_join(simple,donationdata$donor[,c('releaseID','DateOfBirth','Sex','BloodGroup')],by='releaseID')
+simple$age= as.numeric(difftime(simple$DonationDate,simple$DateOfBirth),unit="weeks")/52.25
+
+date0 = simple %>%
+  group_by(releaseID) %>%
+  summarise(date0=min(DonationDate),.groups='drop')
+
+donation0 = simple %>%
+  inner_join(date0,join_by(x$DonationDate==y$date0,releaseID))
+
+donation.r = simple[1:10] %>%
+  left_join(date0,join_by(x$DonationDate==y$date0,releaseID))
+
+donation0$year=year(donation0$DonationDate)
+
+donation0$year.factor = as.factor(donation0$year)
+str(donation0$year.factor)
+
+# Regressiomalleja
+
+m=lm(Hb~age+Sex+year,data=donation0)
+summary(m)
+
+m=lm(0+Hb~age+Sex+Sex:year,data=donation0)
+summary(m)
+
+m=lm(0+Hb~age+Sex+year.factor:Sex,data=donation0[donation0$year>=2005,])
+# m=lm(0+Hb~age+year.factor:Sex,data=donation0)
+summary(m)
+sm=summary(m)
+# plot(sm$coeff[4:nrow(sm$co),1])
+
+cofs = sm$coeff
+conames=rownames(sm$coeff)
+codf=data.frame(name=conames,estimate=cofs[,1])
+wh=grep('(Male|Female):',conames)
+codf$Sex[wh]=sub('.*(Male|Female).*','\\1',conames[wh])
+codf$year[wh]=sub('[^0-9]+([0-9]+).*','\\1',conames[wh])
+codf=cbind(codf,confint(m))
+
+
+codf=codf[!is.na(codf$Sex),]
+pah=pivot_wider(codf,names_from='year',values_from='estimate',id_cols=c('Sex'))
+pah=as.data.frame(pah[,-1])
+str(pah)
+pah2=pivot_wider(codf,names_from='year',values_from='2.5 %',id_cols=c('Sex'))
+pah2=as.data.frame(pah2[,-1])
+pah3=pivot_wider(codf,names_from='year',values_from='97.5 %',id_cols=c('Sex'))
+pah3=as.data.frame(pah3[,-1])
+
+pah.all=rbind(pah,pah2,pah3)
+str(pah.all) 
+
+matplot(t(pah.all),type='l',lty=c(rep('solid',2),rep('dashed',4)),col=rep(c('red','blue'),2))
+cofs
+m=lm(Hb~year,data=donation0)
+summary(m)
+```
+
+
+```{r}
+# Jakaumia
+dist = donation0 %>%
+  filter(!is.na(Hb)) %>%
+  mutate(Hb=pmin(pmax(Hb,100),200)) %>%
+  group_by(year,Sex,Hb) %>%
+  summarise(n=n(),.groups='drop')
+
+dist$Hb=as.integer(dist$Hb)
+dist$year=as.integer(dist$year)
+dist.male = as.data.frame(dist[dist$Sex=='Male',!colnames(dist) %in% c('Sex')])
+tab.male = as.data.frame(pivot_wider(dist.male,names_from='Hb',values_from='n',values_fill=0,names_sort=TRUE))
+rownames(tab.male)=tab.male$year
+tab.male=tab.male[,-1]
+tab.male
+row.sums = apply(tab.male,1,sum,na.rm=TRUE)
+prop.male = tab.male / row.sums
+# prop.male[is.na(prop.male)] = 0
+cuml.male = apply(prop.male,1,cumsum)
+dim(cuml.male)
+cuml.male[,1]
+
+tab.male[1:5,1:5]
+i=0
+dim(cuml.male)
+for (i in 0:4) {
+  matplot(cuml.male[1:40,5*i+(1:5)],type='l',ylim=c(0,0.1),main=paste(5*i+(1:5),collapse=' '))
+}
+lines(1:ncol(cuml.male),cuml.male['135',])
+
+colnames(cuml.male)
+cuml.male['135',]
+
+
+
+matplot(cuml.male[1:40,5*i+(1:5)],type='l',ylim=c(0,0.2))
+  
+?matplot
+
+cuml.male["135",]
+
+cuml.male[,1]
+
+str(dist.male)
+```
+
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
