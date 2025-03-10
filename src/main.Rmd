@@ -21,7 +21,7 @@ library(tidyr)
 ```
 
 
-```{r}
+```{r load-and-process-data}
 simple = donationdata$donation
 wh = which(simple$Hb==50)
 simple[wh,]
@@ -54,8 +54,54 @@ seasonal = donation.r %>%
   group_by(month) %>%
   summarise(seasonal=mean(Hb,na.rm=TRUE),.groups='drop')
 
+# repeat donations (?)
 donation.r = inner_join(donation.r,seasonal,join_by(month))
 
+# donation0$year=year(donation0$DonationDate)
+# donation0$year.factor=as.factor(donation0$year)
+```
+
+```{r function-definitions}
+
+plotYearSex = function(m,relative=FALSE) {
+  cofs = summary(m)$coeff
+  conames=rownames(cofs)
+  codf=data.frame(name=conames,estimate=cofs[,1])
+  wh=grep('(Male|Female)',conames)
+  codf$Sex[wh]=sub('.*(Male|Female).*','\\1',conames[wh])
+  wh=grep('[0-9][0-9][0-9][0-9]',conames)
+  codf$year[wh]=sub('[^0-9]+([0-9]+).*','\\1',conames[wh])
+  codf=cbind(codf,confint(m))
+  
+  codf=codf[!is.na(codf$year),]
+  pah=pivot_wider(codf,names_from='year',values_from='estimate',id_cols=c('Sex'))
+  rn = as.vector(pah[,1])
+  pah=as.data.frame(pah[,-1])
+  rownames(pah)=rn$Sex
+  
+  means=apply(pah,1,mean)
+  if (!relative)
+    means=0*means
+  
+  pah=pah-means
+  
+  pah2=pivot_wider(codf,names_from='year',values_from='2.5 %',id_cols=c('Sex'))
+  pah2=as.data.frame(pah2[,-1])
+  pah2=pah2-means
+  pah3=pivot_wider(codf,names_from='year',values_from='97.5 %',id_cols=c('Sex'))
+  pah3=as.data.frame(pah3[,-1])
+  pah3=pah3-means
+  
+  pah.all=rbind(pah,pah2,pah3)
+  
+  matplot(t(pah.all),type='l',lty=c(rep('solid',2),rep('dashed',4)),col=rep(c('red','blue'),2),axes=FALSE)
+  axis(2)
+  axis(side=1,at=1:ncol(pah.all),labels=colnames(pah.all))
+  return(pah.all)
+}
+```
+
+```{r}
 m=lm(0+Hb~age+Sex+seasonal+year.factor:Sex,data=donation.r[donation.r$year>=2005,])
 sm=summary(m)
 r.mat=plotYearSex(m)
@@ -67,13 +113,12 @@ str(seasonal)
 seasonal$month=as.integer(seasonal$month)
 str(adjustment)
 str(donation0)
-
-# donation0$year=year(donation0$DonationDate)
-# donation0$year.factor=as.factor(donation0$year)
 ```
 
 
 ```{r}
+# compute the adjusted data for first-time donations (?):
+# substract the unexplained effect (year x sex) estimated from 
 donation0a = donation0 %>%
   inner_join(seasonal,join_by(month)) %>%
   inner_join(adjustment,join_by(Sex,year)) %>%
@@ -144,42 +189,6 @@ summary(m)
 sm=summary(m)
 # plot(sm$coeff[4:nrow(sm$co),1])
 
-plotYearSex = function(m,relative=FALSE) {
-  cofs = summary(m)$coeff
-  conames=rownames(cofs)
-  codf=data.frame(name=conames,estimate=cofs[,1])
-  wh=grep('(Male|Female)',conames)
-  codf$Sex[wh]=sub('.*(Male|Female).*','\\1',conames[wh])
-  wh=grep('[0-9][0-9][0-9][0-9]',conames)
-  codf$year[wh]=sub('[^0-9]+([0-9]+).*','\\1',conames[wh])
-  codf=cbind(codf,confint(m))
-  
-  codf=codf[!is.na(codf$year),]
-  pah=pivot_wider(codf,names_from='year',values_from='estimate',id_cols=c('Sex'))
-  rn = as.vector(pah[,1])
-  pah=as.data.frame(pah[,-1])
-  rownames(pah)=rn$Sex
-  
-  means=apply(pah,1,mean)
-  if (!relative)
-    means=0*means
-  
-  pah=pah-means
-  
-  pah2=pivot_wider(codf,names_from='year',values_from='2.5 %',id_cols=c('Sex'))
-  pah2=as.data.frame(pah2[,-1])
-  pah2=pah2-means
-  pah3=pivot_wider(codf,names_from='year',values_from='97.5 %',id_cols=c('Sex'))
-  pah3=as.data.frame(pah3[,-1])
-  pah3=pah3-means
-  
-  pah.all=rbind(pah,pah2,pah3)
-  
-  matplot(t(pah.all),type='l',lty=c(rep('solid',2),rep('dashed',4)),col=rep(c('red','blue'),2),axes=FALSE)
-  axis(2)
-  axis(side=1,at=1:ncol(pah.all),labels=colnames(pah.all))
-  return(pah.all)
-}
 cofs
 m=lm(Hb~year,data=donation0)
 summary(m)
@@ -229,33 +238,26 @@ cuml.male['135',]
 
 
 matplot(cuml.male[1:40,5*i+(1:5)],type='l',ylim=c(0,0.2))
-  
-?matplot
-
-cuml.male["135",]
-
-cuml.male[,1]
-
-str(dist.male)
 ```
 
+```{r normal-distribution-parameter-testing}
+avg=150
+stdev=8
+pnorm(135,mean=avg,sd=stdev)
 
-## R Markdown
+diff=seq(-5,2,0.1)
+y=pnorm(135+diff,mean=avg,sd=stdev)
+wh0=which(diff==0) 
+y=y/y[wh0]
+plot(y~diff,xlab='difference in mean',ylab=paste0('ratio between mean+diff and mean=',avg))
+abline(v=0,lty='dashed')
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+diff=seq(-1,3,0.05)
+y=pnorm(135,mean=avg,sd=stdev+diff)
+wh0=which(diff==0)
+y=y/y[wh0]
+plot(y~diff,xlab='difference in stdev',ylab=paste0('ratio between stdev+diff and stdev=',stdev))
+abline(v=0,lty='dashed')
+# Riippuvuus ei ole lineaarinen
+# abline(a=y[wh0],b=(y[length(y)]-y[1])/(diff[length(diff)]-diff[1]))
 ```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
