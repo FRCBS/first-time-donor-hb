@@ -81,6 +81,8 @@ plotHbDist = function(data0,sex,cutoff,zoom=TRUE) {
   ndist=dnorm(unique(freq$Hb),mean=mean0,sd=sd0)
   lines(unique(freq$Hb),ndist)
   abline(v=cutoff,col='blue')
+  
+  return(list(mean0=mean0,sd0=sd0))
 }
 
 estimateTrend = function(final) {
@@ -209,12 +211,13 @@ summary(m)
 ```{r}
 hmm = simple %>%
   filter(Sex=='Male') %>%
-  mutate(referred=(Hb<135)) %>%
+  mutate(referred=(Hb<135),on.boundary=(Hb==135)) %>%
   group_by(year) %>%
-  summarise(n=n(),n.referred=sum(referred,na.rm=TRUE)) %>%
-  mutate(prop=n.referred/n)
+  summarise(n=n(),n.referred=sum(referred,na.rm=TRUE),n.boundary=sum(on.boundary,na.rm=TRUE)) %>%
+  mutate(prop=n.referred/n,ratio=n.referred/n.boundary)
 plot(n.referred~year,data=hmm,type='l',lwd=3)
 plot(prop~year,data=hmm,type='l',lwd=3)
+plot(ratio~year,data=hmm,type='l',lwd=3,main='ratio of number referred to number at boundary (male/135)')
 
 simple %>%
   group_by(BloodDonationTypeKey) %>%
@@ -245,9 +248,8 @@ shapiro.test(freq$n)
 
 
 ```{r normal-distribution-parameter-testing}
-avg=150
-stdev=8
-pnorm(135,mean=avg,sd=stdev)
+avg=155
+stdev=11
 
 diff=seq(-5,2,0.1)
 y=pnorm(135+diff,mean=avg,sd=stdev)
