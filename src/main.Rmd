@@ -65,9 +65,9 @@ donation.r = inner_join(donation.r,seasonal,join_by(month))
 plotHbDist = function(data0,sex,cutoff,zoom=TRUE) {
   sex0=data0[data0$year>=2005&data0$Sex==sex&!is.na(data0$Hb)&data0$BloodDonationTypeKey %in% c('Whole Blood (K)','No Donation (E)'),c('Hb')]  
   freq = sex0 %>%
-  group_by(Hb) %>%
-  summarise(n=n()) %>%
-  mutate(prop=n/sum(n))
+    group_by(Hb) %>%
+    summarise(n=n()) %>%
+    mutate(prop=n/sum(n))
 
   limits = NULL
   if (zoom)
@@ -239,6 +239,104 @@ plotHbDist(simple,'Female',125,TRUE)
 ```
 
 ```{r}
+data0=simple
+sex='Male'
+cutoff=135
+  sex0=data0[data0$year>=2005&data0$Sex==sex&!is.na(data0$Hb)&data0$BloodDonationTypeKey %in% c('Whole Blood (K)','No Donation (E)'),c('Hb')]  
+  freq = sex0 %>%
+    group_by(Hb) %>%
+    summarise(n=n()) %>%
+    mutate(prop=n/sum(n))
+
+  
+    # qqnorm(data0$Hb)
+  # stest =data0 %>% filter(sex=='Male',year==2010) %>% select(Hb) 
+  # qqnorm(stest$Hb)
+
+  mean0=mean(sex0$Hb)
+  sd0=sd(sex0$Hb)
+freq
+nls(prop~exp(-((Hb-mean)^2/2*sd^2))/(2*pi*sd),data=freq,start=list(sd=sd0,mean=mean0))
+  ?nls
+
+  plot(prop~Hb,data=freq,type='l',lwd=2,xlim=NULL)
+  Hb.values = unique(freq$Hb)
+  
+
+  ndist=dnorm(Hb.values,mean=mean0,sd=sd0)
+  lines(unique(freq$Hb),ndist)
+
+  
+  plot(prop~Hb,data=freq2,type='l',lwd=2,xlim=NULL)
+  Hb.values = unique(freq$Hb)
+  
+  ndist2=dnorm(Hb.values,mean=mean1,sd=sd1)
+  lines(Hb.values,ndist2,col='green')
+
+  
+
+    
+  abline(v=cutoff,col='blue')
+
+  
+  plot(freq$prop-ndist~Hb.values)
+  abline(v=cutoff,col='blue')
+  abline(h=c(-1,1)*0.0005,col='red')
+
+  cnt = 0
+  freq2 = freq
+  k = which(freq$Hb==cutoff) 
+  while (TRUE) {
+    diff = (freq2$prop-ndist)[1:(k-1)]
+    wh = which(diff < -0.0005)
+    if (length(wh) == 0)
+      break
+    wh0 = max(wh)
+    ds0 = diff[wh0]
+    
+    diff.plus = (freq2$prop-ndist)[k:nrow(freq2)]
+    wh = which(diff.plus > 0.0005)
+    if (length(wh) == 0)
+      break
+    wh1 = min(wh)
+    ds1 = diff.plus[wh1]
+    
+    to.adjust = min(-ds0,ds1)
+    
+    freq2$prop[wh0] = freq2$prop[wh0] + to.adjust
+    freq2$prop[wh1+(k-1)] = freq2$prop[wh1+(k-1)] - to.adjust
+    
+    print(paste(wh0,':',ds0,':',wh1+(k-1),':',ds1,'=>',to.adjust))
+    
+    cnt = cnt + 1
+    if (cnt > 1000) {
+      print('max iterations exceeded')
+      break
+    }
+  }
+  
+  A=sqrt(2*pi*sd0^2)
+  y = freq$prop
+  y = dnorm(seq(-50,50,0.1),0,sd0)
+  x = sqrt(-log(A*y)*2*sd0^2)
+  plot(y~x)
+  
+```
+```{r}
+mean1=  freq2 %>% 
+    mutate(mom=Hb*prop) %>%
+    summarise(mean=sum(mom))
+mean1-mean0
+mean1=as.numeric(mean1)
+sd1 =  freq2 %>% 
+    mutate(mom=(Hb-as.numeric(mean1))^2*prop) %>%
+    summarise(sdx=sum(mom)) 
+sd1=sqrt(as.numeric(sd1))
+sd1-sd0
+```
+
+
+```{r}
 donation0 %>% filter(Hb<135,Sex=='Male')
 
 skewness(freq$n)
@@ -248,7 +346,7 @@ shapiro.test(freq$n)
 
 
 ```{r normal-distribution-parameter-testing}
-avg=155
+vavg=155
 stdev=11
 
 diff=seq(-5,2,0.1)
