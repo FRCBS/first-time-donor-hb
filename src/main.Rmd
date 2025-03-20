@@ -10,16 +10,15 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
-```{r}
-load('C:/git_repot/DATA/donationdata.fortimo.rdata')
-```
-
-```{r}
+```{r load-packages}
 # install.packages('moments')
 library(dplyr)
 library(lubridate)
 library(tidyr)
 library(moments)
+```
+```{r load-data}
+load('C:/git_repot/DATA/donationdata.fortimo.rdata')
 ```
 
 
@@ -238,7 +237,7 @@ plotHbDist(simple,'Female',125,FALSE)
 plotHbDist(simple,'Female',125,TRUE)
 ```
 
-```{r}
+```{r distribution-analysis}
 data0=simple
 sex='Male'
 cutoff=135
@@ -255,30 +254,16 @@ cutoff=135
 
   mean0=mean(sex0$Hb)
   sd0=sd(sex0$Hb)
-freq
-nls(prop~exp(-((Hb-mean)^2/2*sd^2))/(2*pi*sd),data=freq,start=list(sd=sd0,mean=mean0))
-  ?nls
 
+  # Käsittelemätön jakauma
   plot(prop~Hb,data=freq,type='l',lwd=2,xlim=NULL)
-  Hb.values = unique(freq$Hb)
   
-
+  # Estimoituja keskiarvoa ja -hajontaa vastaava normaalijakauma
+  Hb.values = unique(freq$Hb)
   ndist=dnorm(Hb.values,mean=mean0,sd=sd0)
   lines(unique(freq$Hb),ndist)
-
   
-  plot(prop~Hb,data=freq2,type='l',lwd=2,xlim=NULL)
-  Hb.values = unique(freq$Hb)
-  
-  ndist2=dnorm(Hb.values,mean=mean1,sd=sd1)
-  lines(Hb.values,ndist2,col='green')
-
-  
-
-    
-  abline(v=cutoff,col='blue')
-
-  
+  # Erotuskuvaaja, tämä ei ole kovin tärkeä mutta sama tietysti ottaa mukaan
   plot(freq$prop-ndist~Hb.values)
   abline(v=cutoff,col='blue')
   abline(h=c(-1,1)*0.0005,col='red')
@@ -310,19 +295,30 @@ nls(prop~exp(-((Hb-mean)^2/2*sd^2))/(2*pi*sd),data=freq,start=list(sd=sd0,mean=m
     
     cnt = cnt + 1
     if (cnt > 1000) {
-      print('max iterations exceeded')
+      print('max iterations exceeded (back-stop)')
       break
     }
   }
-  
-  A=sqrt(2*pi*sd0^2)
-  y = freq$prop
-  y = dnorm(seq(-50,50,0.1),0,sd0)
-  x = sqrt(-log(A*y)*2*sd0^2)
-  plot(y~x)
-  
+
+  mean1=  freq2 %>% 
+      mutate(mom=Hb*prop) %>%
+      summarise(mean=sum(mom))
+  mean1=as.numeric(mean1)
+  sd1 =  freq2 %>% 
+      mutate(mom=(Hb-as.numeric(mean1))^2*prop) %>%
+      summarise(sdx=sum(mom)) 
+  sd1=sqrt(as.numeric(sd1))
+
+  plot(prop~Hb,data=freq2,type='l',lwd=2,xlim=NULL)
+  ndist2=dnorm(Hb.values,mean=mean1,sd=sd1)
+  lines(Hb.values,ndist2,col='green')
+  abline(v=cutoff,col='blue',lty='dashed')
+  rect(mean1-5,0,mean1+5,0.001,col='pink',ldw=2)
+  abline(v=mean1,lty='dotted',lwd=3)
 ```
+
 ```{r}
+# These have been copied to the chunk above
 mean1=  freq2 %>% 
     mutate(mom=Hb*prop) %>%
     summarise(mean=sum(mom))
