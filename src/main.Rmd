@@ -238,10 +238,8 @@ plotHbDist(simple,'Female',125,TRUE)
 ```
 
 ```{r distribution-analysis}
-data0=simple
-sex='Male'
-cutoff=135
-  sex0=data0[data0$year>=2005&data0$Sex==sex&!is.na(data0$Hb)&data0$BloodDonationTypeKey %in% c('Whole Blood (K)','No Donation (E)'),c('Hb')]  
+rectifyDistribution = function (data0,sex,cutoff,plot=TRUE) {
+  sex0=data0[data0$Sex==sex&!is.na(data0$Hb)&data0$BloodDonationTypeKey %in% c('Whole Blood (K)','No Donation (E)'),c('Hb')]  
   freq = sex0 %>%
     group_by(Hb) %>%
     summarise(n=n()) %>%
@@ -255,18 +253,20 @@ cutoff=135
   mean0=mean(sex0$Hb)
   sd0=sd(sex0$Hb)
 
-  # Käsittelemätön jakauma
-  plot(prop~Hb,data=freq,type='l',lwd=2,xlim=NULL)
-  
   # Estimoituja keskiarvoa ja -hajontaa vastaava normaalijakauma
   Hb.values = unique(freq$Hb)
   ndist=dnorm(Hb.values,mean=mean0,sd=sd0)
-  lines(unique(freq$Hb),ndist)
+  
+  # Käsittelemätön jakauma
+  if (plot) {
+    plot(prop~Hb,data=freq,type='l',lwd=2,xlim=NULL)
+    lines(unique(freq$Hb),ndist)
   
   # Erotuskuvaaja, tämä ei ole kovin tärkeä mutta sama tietysti ottaa mukaan
-  plot(freq$prop-ndist~Hb.values)
-  abline(v=cutoff,col='blue')
-  abline(h=c(-1,1)*0.0005,col='red')
+    plot(freq$prop-ndist~Hb.values)
+    abline(v=cutoff,col='blue')
+    abline(h=c(-1,1)*0.0005,col='red')
+  }
 
   cnt = 0
   freq2 = freq
@@ -291,7 +291,7 @@ cutoff=135
     freq2$prop[wh0] = freq2$prop[wh0] + to.adjust
     freq2$prop[wh1+(k-1)] = freq2$prop[wh1+(k-1)] - to.adjust
     
-    print(paste(wh0,':',ds0,':',wh1+(k-1),':',ds1,'=>',to.adjust))
+    # print(paste(wh0,':',ds0,':',wh1+(k-1),':',ds1,'=>',to.adjust))
     
     cnt = cnt + 1
     if (cnt > 1000) {
@@ -309,13 +309,104 @@ cutoff=135
       summarise(sdx=sum(mom)) 
   sd1=sqrt(as.numeric(sd1))
 
-  plot(prop~Hb,data=freq2,type='l',lwd=2,xlim=NULL)
-  ndist2=dnorm(Hb.values,mean=mean1,sd=sd1)
-  lines(Hb.values,ndist2,col='green')
-  abline(v=cutoff,col='blue',lty='dashed')
-  rect(mean1-5,0,mean1+5,0.001,col='pink',ldw=2)
-  abline(v=mean1,lty='dotted',lwd=3)
+  if (plot) {
+    plot(prop~Hb,data=freq2,type='l',lwd=2,xlim=NULL)
+    ndist2=dnorm(Hb.values,mean=mean1,sd=sd1)
+    lines(Hb.values,ndist2,col='green')
+    abline(v=cutoff,col='blue',lty='dashed')
+    rect(mean1-5,0,mean1+5,0.001,col='pink',lwd=2)
+    abline(v=mean1,lty='dotted',lwd=3)
+    
+    plot(freq2$prop-ndist2~Hb.values)
+    abline(v=cutoff,col='blue',lty='dashed')
+    abline(h=c(-1,1)*0.0005,col='red',lty='dashed')
+  }
+
+  return(list(dist=freq2,mean1=mean1,sd1=sd1))
+}
+
 ```
+
+```{r}
+data0=simple
+sex='Male'
+cutoff=135
+dist.male = rectifyDistribution(simple,'Male',cutoff)
+# Mitä tietoja oikeastaan tarvittaisiin: jakauma itsessään(~), mean1, sd1, error (suhde normaalijakaumaan), korjauksen summa
+# Jos ei plottaa, tämän saa kätevästi apply:lla (rivinumerot jos ei muu auta, kaivellaan sitten funktiossa esiin)
+
+simple$limit=135
+simple$limit[simple$Sex=='Female']=125
+simple$deferred=0
+simple$deferred[simple$Hb<simple$limit]=1
+
+donation0$limit=135
+donation0$limit[donation0$Sex=='Female']=125
+donation0$deferred=0
+donation0$deferred[donation0$Hb<donation0$limit]=1
+
+# simple$deferred[simple$Sex=='Female'&simple$Hb<125]=1
+# simple$deferred[simple$Sex=='Male'&simple$Hb<135]=1
+
+basics = donation0 %>% # simple
+  filter(!is.na(Hb)) %>%
+  group_by(year,Sex) %>%
+  summarise(n=n(),mean0=mean(Hb,na.rm=TRUE),sd0=sd(Hb,na.rm=TRUE),deferred.perc=sum(deferred)/n(),limit=min(limit),.groups='drop')
+
+basics.all = simple %>% # simple
+  filter(!is.na(Hb)) %>%
+  group_by(year,Sex) %>%
+  summarise(n=n(),mean.year=mean(Hb,na.rm=TRUE),sd0=sd(Hb,na.rm=TRUE),deferred.perc=sum(deferred)/n(),limit=min(limit),.groups='drop')
+
+true.basics = simple %>%
+  filter(!is.na(Hb)) %>%
+  group_by(Sex) %>%
+  summarise(n=n(),mean.all=mean(Hb,na.rm=TRUE),sd0=sd(Hb,na.rm=TRUE),deferred.perc=sum(deferred)/n(),limit=min(limit),.groups='drop')
+
+basics = basics %>%
+  inner_join(true.basics[,c('Sex','mean.all')],join_by(Sex)) %>%
+  inner_join(basics.all[,c('Sex','mean.year','year')],join_by(Sex,year))
+
+basics$mean1=NA
+basics$sd1=NA
+
+# data0=simple[simple$year==basics$year[i],]
+for (i in 1:nrow(basics)) {
+  rv = rectifyDistribution(simple[simple$year==basics$year[i],],basics$Sex[i],if(basics$Sex[i]=='Male') 135 else 125,FALSE)
+  basics$mean1[i] = rv$mean1
+  basics$sd1[i] = rv$sd1
+}
+
+basics$dperc0=pnorm(basics$limit,basics$mean0,basics$sd0)
+basics$dperc.nrm=pnorm(basics$limit+(basics$mean.year-basics$mean.all),basics$mean0,basics$sd0)
+
+sex.col=data.frame(sex=c('Female','Male'),col=c('Red','Blue'))
+
+# plot.cols=c('dperc0')
+plotColBySex = function(basics,col,ylab) {
+  par(mar=c(2,4,0,4))
+  plot.cols=c(col)
+  plot(basics$year,basics[[plot.cols[1]]],type='n',ylab=ylab)
+  for (i in 1:nrow(sex.col)) {
+    data1 = basics[basics$Sex==sex.col$sex[i],]
+    for (col in plot.cols) {
+      lines(data1$year,data1[[col]],col=sex.col$col[i],lwd=2)
+      frml=paste0(col,'~year')
+      m=lm(formula(frml),data=data1)
+      sm=summary(m)
+      print(sm)
+      sm$coeff[2,4]
+      abline(a=sm$coeff[1,1],b=sm$coeff[2,1],col=sex.col$col[i],lty='dashed',lwd=2)
+      text(x=min(data1$year),y=min(data1[[col]])+0.01,labels=paste0('b=',round(100*sm$coeff[2,1],5),'%,p=',round(sm$coeff[2,4],3)),adj=c(0))
+    }
+  }
+}
+
+plotColBySex(basics,'dperc0','theoretical proportion deferred (unadjusted mean)')
+plotColBySex(basics,'dperc.nrm','theoretical proportion deferred (adjusted mean)')
+plotColBySex(basics,'deferred.perc','actual percentage deferred')
+```
+
 
 ```{r}
 # These have been copied to the chunk above
