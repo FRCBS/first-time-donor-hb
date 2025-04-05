@@ -30,10 +30,12 @@ simple$month = as.factor(month(simple$DonationDate))
 simple$year = year(simple$DonationDate)
 simple$year.factor = as.factor(simple$year)
 
+# date of first donation
 date0 = simple %>%
   group_by(releaseID) %>%
   summarise(date0=min(DonationDate),.groups='drop')
 
+# first-time donations
 donation0 = simple %>%
   inner_join(date0,join_by(x$DonationDate==y$date0,releaseID))
 
@@ -43,9 +45,6 @@ donation.r = simple %>%
   filter(is.na(sent)) %>%
   select(-sent) %>%
   mutate(month=as.integer(month))
-
-# mr=lm(Hb~0+month,data=donation.r)
-# summary(mr) # Nämä olisi varmaankin saanut myös suoraan keskiarvoina
 
 seasonal = donation.r %>%
   group_by(month) %>%
