@@ -46,6 +46,7 @@ donation.r = simple %>%
   select(-sent) %>%
   mutate(month=as.integer(month))
 
+# Kuukausittaiset keskiarvot toistoluovuttajilta (toistoluovutuksista)
 seasonal = donation.r %>%
   group_by(month) %>%
   summarise(seasonal=mean(Hb,na.rm=TRUE),.groups='drop') %>%
@@ -61,7 +62,8 @@ donation.r = inner_join(donation.r,seasonal,join_by(month))
 
 ```{r function-definitions}
 plotHbDist = function(data0,sex,cutoff,zoom=TRUE) {
-  sex0=data0[data0$year>=2005&data0$Sex==sex&!is.na(data0$Hb)&data0$BloodDonationTypeKey %in% c('Whole Blood (K)','No Donation (E)'),c('Hb')]  
+  sex0=data0[data0$year>=2005&data0$Sex==sex & 
+              !is.na(data0$Hb)&data0$BloodDonationTypeKey %in% c('Whole Blood (K)','No Donation (E)'),c('Hb')]  
   freq = sex0 %>%
     group_by(Hb) %>%
     summarise(n=n()) %>%
@@ -99,6 +101,7 @@ matToLonger = function(mat) {
   return(df1)
 }
 
+# This function is in active use, but it doesn't seem to refer the functions above
 plotYearSex = function(m,relative=FALSE) {
   cofs = summary(m)$coeff
   conames=rownames(cofs)
@@ -138,16 +141,24 @@ plotYearSex = function(m,relative=FALSE) {
 ```
 
 ```{r}
-m=lm(0+Hb~age+Sex+seasonal+year.factor:Sex,data=donation.r[donation.r$year>=2005,])
+# 2025-04-05 This seems to be a reasoable regression for the year-sex adjustment factors
+# seasonal on tässä 146.451181
+m=lm(0+Hb~age+Sex+seasonal+year.factor:Sex,data=donation.r[donation.r$year>=2002,])
 sm=summary(m)
 r.mat=plotYearSex(m)
-adjustment=pivot_longer(cbind(Sex=rownames(r.mat)[1:2],r.mat[1:2,]),colnames(r.mat),names_to='year') # ,names_to='Sex',values_to='value')
-adjustment$year=as.integer(adjustment$year)
+# r.mat is used in a later block
+# r.adjustment is the relevant data now
+# adjustment is defined elsewhere, definition has been erased; the path kind of ends here.
 
-str(seasonal)
-seasonal$month=as.integer(seasonal$month)
-str(adjustment)
-str(donation0)
+if (FALSE) {
+  adjustment=pivot_longer(cbind(Sex=rownames(r.mat)[1:2],r.mat[1:2,]),colnames(r.mat),names_to='year')
+  adjustment$year=as.integer(adjustment$year)
+  
+  str(seasonal)
+  seasonal$month=as.integer(seasonal$month)
+  str(adjustment)
+  str(donation0)
+}
 ```
 
 
@@ -159,6 +170,10 @@ donation0a = donation0 %>%
   inner_join(seasonal,join_by(month)) %>%
   inner_join(adjustment,join_by(Sex,year)) %>%
   mutate(Hb.adj = Hb - value)
+# alright, so here the r.mat values are subtracted from the Hb values
+# And what we get, are the annual effect
+# But these are kind of residuals then
+# So better use the rmat values as is done in the current computations
 
 donation0a$month.factor=as.factor(donation0a$month)
 
@@ -168,14 +183,15 @@ summary(donation0a)
 m=lm(Hb.adj~0+Sex+age+year.factor:Sex+seasonal,data=donation0a[donation0a$year>=2005,])
 sm=summary(m)
 final=plotYearSex(m,relative=TRUE)
-estimateTrend(final)
+festimateTrend(final)
 apply(final,1,min)
 apply(final,1,max)
 
 # unadjusted data
-m=lm(Hb~0+age+Sex+year.factor:Sex,data=donation0[donation0$year>=2005,])
-summary(m)
-final=plotYearSex(m,relative=TRUE)
+m.final=lm(Hb~0+age+Sex+year.factor:Sex,data=donation0[donation0$year>=2005,])
+summary(m.final)
+final=plotYearSex(m.final) #,relative=TRUE)
+r.mat=plotYearSex(m)
 estimateTrend(final)
 ```
 
@@ -243,7 +259,6 @@ rectifyDistribution = function (data0,sex,cutoff,plot=TRUE) {
     group_by(Hb) %>%
     summarise(n=n()) %>%
     mutate(prop=n/sum(n))
-
   
     # qqnorm(data0$Hb)
   # stest =data0 %>% filter(sex=='Male',year==2010) %>% select(Hb) 
@@ -309,9 +324,9 @@ rectifyDistribution = function (data0,sex,cutoff,plot=TRUE) {
   sd1=sqrt(as.numeric(sd1))
 
   if (plot) {
-    plot(prop~Hb,data=freq2,type='l',lwd=2,xlim=NULL)
+    plot(prop~Hb,data=freq2,type='l',lwd=3,xlim=NULL)
     ndist2=dnorm(Hb.values,mean=mean1,sd=sd1)
-    lines(Hb.values,ndist2,col='green')
+    lines(Hb.values,ndist2,col='red',lty='dotted',lwd=2)
     abline(v=cutoff,col='blue',lty='dashed')
     rect(mean1-5,0,mean1+5,0.001,col='pink',lwd=2)
     abline(v=mean1,lty='dotted',lwd=3)
@@ -344,6 +359,9 @@ donation0$limit[donation0$Sex=='Female']=125
 donation0$deferred=0
 donation0$deferred[donation0$Hb<donation0$limit]=1
 
+# pitäisikö käyttää myös donation.r erikseen? 
+# Voisi laskea kokeeksi siihenkin
+
 # simple$deferred[simple$Sex=='Female'&simple$Hb<125]=1
 # simple$deferred[simple$Sex=='Male'&simple$Hb<135]=1
 
@@ -369,19 +387,48 @@ basics = basics %>%
 basics$mean1=NA
 basics$sd1=NA
 
-# data0=simple[simple$year==basics$year[i],]
+# Compute the adjusted means and standard deviations using rectified distributions
 for (i in 1:nrow(basics)) {
-  rv = rectifyDistribution(simple[simple$year==basics$year[i],],basics$Sex[i],if(basics$Sex[i]=='Male') 135 else 125,FALSE)
+  # nb! This used to be simple, eg. all donations were considered
+  # Maybe should add them back
+  # Probably best would be to add columns to distinguish between first time and repeat donors
+  # Make a function to compile these stats for different subsets of donations: 1) first-time 2) repeat 3) all
+  # Then see, what is useful
+  # Probably should also convert the different mean etc. to columns, or should this be in fully long form? Maybe a mix
+  rv = rectifyDistribution(donation0[donation0$year==basics$year[i],],basics$Sex[i],if(basics$Sex[i]=='Male') 135 else 125,FALSE)
   basics$mean1[i] = rv$mean1
   basics$sd1[i] = rv$sd1
 }
 
 basics$dperc0=pnorm(basics$limit,basics$mean0,basics$sd0)
+
+# r.mat.long=pivot_longer(r.mat,colnames(r.mat),names_to='year')
+# lm-adjusted means (year x sex)
+lm.data=pivot_longer(cbind(Sex=rownames(r.mat),r.mat)[1:2,],colnames(r.mat),names_to='year',values_to='mean.lm')
+lm.data$year=as.integer(lm.data$year)
+basics=left_join(basics,lm.data,join_by(year,Sex))
+basics$mean.lm[is.na(basics$mean.lm)]=0
+
+# Compute the first adjusted value (dperc.nrm) using the all time averages for Hb (grouped by sex)
 basics$dperc.nrm=pnorm(basics$limit+(basics$mean.year-basics$mean.all),basics$mean0,basics$sd0)
+basics$dperc.lm=pnorm(basics$limit+basics$mean.lm,basics$mean0,basics$sd0)
+basics$dperc.nrm.1=pnorm(basics$limit+(basics$mean.year-basics$mean.all),basics$mean1,basics$sd1)
 
 sex.col=data.frame(sex=c('Female','Male'),col=c('Red','Blue'))
 
+# This all should be done more systematically
+# Should also be able to look at repeat deferrals
+# Given the major differences in sd's, maybe should adjust for them as well;
+# or rather, in the theoretical computations, the adjustment is already made.
+
+# For plotting, should adjust:
+# - b-labels with correct units (or none at all)
+# - should be able to index values to 1 (or 100), especially for means
+# - Maybe even multiple variables in same chart to enable comparison (mean,sd,deferral%)
+# - and later country
+
 # plot.cols=c('dperc0')
+# basics 
 plotColBySex = function(basics,col,ylab) {
   par(mar=c(2,4,0,4))
   plot.cols=c(col)
@@ -393,17 +440,57 @@ plotColBySex = function(basics,col,ylab) {
       frml=paste0(col,'~year')
       m=lm(formula(frml),data=data1)
       sm=summary(m)
-      print(sm)
-      sm$coeff[2,4]
+      # print(sm)
+      # sm$coeff[2,4]
       abline(a=sm$coeff[1,1],b=sm$coeff[2,1],col=sex.col$col[i],lty='dashed',lwd=2)
       text(x=min(data1$year),y=min(data1[[col]])+0.01,labels=paste0('b=',round(100*sm$coeff[2,1],5),'%,p=',round(sm$coeff[2,4],3)),adj=c(0))
     }
   }
 }
+```
 
+``` {r plotting}
+# means and such
+plotColBySex(basics,'mean0','mean (actual data)')
+plotColBySex(basics,'mean1','theoretical mean (adjusted)')
+plotColBySex(basics,'sd0','sd (actual data)')
+plotColBySex(basics,'sd1','theoretical sd (adjusted)')
+
+# deferral rates
+plotColBySex(basics,'deferred.perc','actual percentage deferred')
 plotColBySex(basics,'dperc0','theoretical proportion deferred (unadjusted mean)')
 plotColBySex(basics,'dperc.nrm','theoretical proportion deferred (adjusted mean)')
-plotColBySex(basics,'deferred.perc','actual percentage deferred')
+plotColBySex(basics,'dperc.lm','adjusted using estimated mean differences')
+```
+
+``` {r new-lm-approach}
+par(mar=c(2,4,0,0))
+data=basics[basics$Sex=='Female',]
+data.female=data
+mean.female=mean(data$deferred.perc)
+plot(deferred.perc~mean1,data=data,ylim=c(0,0.15),xlim=c(130,160),col='red')
+m=lm(deferred.perc~mean1,data=data)
+m1=lm(deferred.perc~mean1+sd1,data=data)
+sm=summary(m)
+sm1=summary(m1)
+sm1.female=sm1
+# prd=predict(m,newdata=data)
+# lines(data$mean1,as.vector(prd))
+abline(a=sm$coeff[1,1],b=sm$coeff[2,1],col='red',lty='dashed',lwd=2)
+text(x=135,y=0.03,labels=paste0('b=',round(sm1$coeff[2,1],3),'\np=',round(sm1$coeff[2,4],3),'\nR',intToUtf8(178),'=',round(sm1$r.squared,3)),adj=c(0))
+data=basics[basics$Sex=='Male',]
+m=lm(deferred.perc~mean1,data=data)
+m1=lm(deferred.perc~mean1+sd1,data=data)
+sm=summary(m)
+sm1=summary(m1)
+abline(a=sm$coeff[1,1],b=sm$coeff[2,1],col='blue',lty='dashed',lwd=2)
+points(data$mean1,data$deferred.perc,col='blue')
+text(x=155,y=0.06,labels=paste0('b=',round(sm1$coeff[2,1],3),'\np=',round(sm1$coeff[2,4],3),'\nR',intToUtf8(178),'=',round(sm1$r.squared,3)),adj=c(0))
+plot(data$year,sm1.female$residuals,col='red',ylim=c(-0.05,0.05),type='l',ylab='residuals',lwd=3)
+lines(data$year,sm1$residuals,col='blue',lwd=3)
+mean.male=mean(data$deferred.perc)
+lines(data$year,data.female$deferred.perc-mean.female,col='red',lty='dotted',lwd=2)
+lines(data$year,data$deferred.perc-mean.male,col='blue',lty='dotted',lwd=2)
 ```
 
 
