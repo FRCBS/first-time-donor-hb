@@ -344,8 +344,9 @@ rectifyDistribution = function (data0,sex,cutoff,plot=TRUE) {
 ```{r}
 data0=simple
 sex='Male'
-cutoff=135
+cutoff=125
 dist.male = rectifyDistribution(simple,'Male',cutoff)
+dist.female = rectifyDistribution(simple,'Female',cutoff)
 # Mitä tietoja oikeastaan tarvittaisiin: jakauma itsessään(~), mean1, sd1, error (suhde normaalijakaumaan), korjauksen summa
 # Jos ei plottaa, tämän saa kätevästi apply:lla (rivinumerot jos ei muu auta, kaivellaan sitten funktiossa esiin)
 
@@ -368,7 +369,7 @@ donation0$deferred[donation0$Hb<donation0$limit]=1
 basics = donation0 %>% # simple
   filter(!is.na(Hb)) %>%
   group_by(year,Sex) %>%
-  summarise(n=n(),mean0=mean(Hb,na.rm=TRUE),sd0=sd(Hb,na.rm=TRUE),deferred.perc=sum(deferred)/n(),limit=min(limit),.groups='drop')
+  summarise(n=n(),mean0=mean(Hb,na.rm=TRUE),sd0=sd(Hb,na.rm=TRUE),deferred.perc=sum(deferred)/n(),limit=min(limit),age=mean(age),.groups='drop')
 
 basics.all = simple %>% # simple
   filter(!is.na(Hb)) %>%
@@ -379,6 +380,13 @@ true.basics = simple %>%
   filter(!is.na(Hb)) %>%
   group_by(Sex) %>%
   summarise(n=n(),mean.all=mean(Hb,na.rm=TRUE),sd0=sd(Hb,na.rm=TRUE),deferred.perc=sum(deferred)/n(),limit=min(limit),.groups='drop')
+true.basics$z=with(true.basics,(limit-mean.all)/sd0)
+true.basics=data.frame(true.basics)
+rownames(true.basics)=true.basics$Sex
+true.basics$comp=true.basics$z[c(2,1)]*true.basics$sd0+true.basics$mean.all
+
+true.basics$comp
+true.basics
 
 basics = basics %>%
   inner_join(true.basics[,c('Sex','mean.all')],join_by(Sex)) %>%
@@ -429,24 +437,36 @@ sex.col=data.frame(sex=c('Female','Male'),col=c('Red','Blue'))
 
 # plot.cols=c('dperc0')
 # basics 
-plotColBySex = function(basics,col,ylab) {
+plotColBySex = function(basics,col,ylab,xvar='year') {
   par(mar=c(2,4,0,4))
   plot.cols=c(col)
-  plot(basics$year,basics[[plot.cols[1]]],type='n',ylab=ylab)
+  plot(basics[[xvar]],basics[[plot.cols[1]]],type='n',ylab=ylab)
   for (i in 1:nrow(sex.col)) {
     data1 = basics[basics$Sex==sex.col$sex[i],]
     for (col in plot.cols) {
-      lines(data1$year,data1[[col]],col=sex.col$col[i],lwd=2)
-      frml=paste0(col,'~year')
+      lines(data1[[xvar]],data1[[col]],col=sex.col$col[i],lwd=2)
+      
+      for (suf in c('low','hi')) {
+        ci.var = paste0(col,'.',suf)
+        if (ci.var %in% names(basics)) {
+          print(ci.var)
+          lines(data1[[xvar]],data1[[ci.var]],lty='dotted',lwd=1,col=sex.col$col[i])
+        }
+      }
+      
+      frml=paste0(col,'~',xvar)
       m=lm(formula(frml),data=data1)
       sm=summary(m)
       # print(sm)
       # sm$coeff[2,4]
       abline(a=sm$coeff[1,1],b=sm$coeff[2,1],col=sex.col$col[i],lty='dashed',lwd=2)
-      text(x=min(data1$year),y=min(data1[[col]])+0.01,labels=paste0('b=',round(100*sm$coeff[2,1],5),'%,p=',round(sm$coeff[2,4],3)),adj=c(0))
+      text(x=min(data1[[xvar]]),y=min(data1[[col]])+0.01,labels=paste0('b=',round(100*sm$coeff[2,1],5),'%,p=',round(sm$coeff[2,4],3)),adj=c(0))
     }
   }
 }
+
+# Eli jos miehiiin sovellettaisiin vastaavaa hylkäysrajaa kuin naisilla (z-arvo), se olisi 138.8
+# Vastaavasti naisilla raja olisi 121.5
 ```
 
 ``` {r plotting}
@@ -491,6 +511,41 @@ lines(data$year,sm1$residuals,col='blue',lwd=3)
 mean.male=mean(data$deferred.perc)
 lines(data$year,data.female$deferred.perc-mean.female,col='red',lty='dotted',lwd=2)
 lines(data$year,data$deferred.perc-mean.male,col='blue',lty='dotted',lwd=2)
+
+year=data$year
+residual=data.female$deferred.perc-mean.female
+m=lm(residual~year)
+summary(m)
+
+table(data$Sex)
+m1=lm(deferred.perc~mean1+sd1+age,data=data)
+summary(m1)
+
+m1=lm(deferred.perc~mean1+sd1+age,data=data.female)
+summary(m1)
+```
+```{r}
+agedist = simple %>%
+  mutate(age=as.integer(age)) %>%
+  filter(!is.na(Hb),age<=70) %>%
+  filter(DonationPlaceType!='Garrison') %>%
+  group_by(age,Sex) %>%
+  summarise(mean=mean(Hb),sd=sd(Hb,na.rm=TRUE),v=var(Hb),n=n(),.groups='drop') %>%
+  mutate(sd.low=sqrt((n-1)*v/qchisq(c(.975), n-1))) %>%
+  mutate(sd.hi =sqrt((n-1)*v/qchisq(c(.0275), n-1))) %>%
+  mutate(mean.low=mean-qnorm(0.025)*sd/sqrt(n)) %>%
+  mutate(mean.hi =mean-qnorm(0.975)*sd/sqrt(n)) %>%
+  filter(n>100)
+
+agedist
+plotColBySex(agedist,'n',xvar = 'age',ylab='')
+plotColBySex(agedist,'mean',xvar = 'age',ylab='')
+plotColBySex(agedist,'sd',xvar = 'age',ylab='')
+
+plotColBySex(basics,'age',xvar='year',ylab='age by year')
+# Keskiarvolle keskivirhe: 
+# Täällä näkyy naisilla kaksikyttyräinen muoto
+# Mutta koska Hb on oleellisesti lineaarinen iän suhteen (pl. varuskuntaluovuttajat), voi silti käyttää keski-ikää
 ```
 
 
