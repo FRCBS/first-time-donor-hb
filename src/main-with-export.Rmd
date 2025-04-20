@@ -34,6 +34,8 @@ param$result.file = file.path(param$wd,"results","data.xlsx")
 
 param$donationdata = 'C:/git_repot/DATA/donationdata.fortimo.rdata'
 
+param$country = 'FI' # Maybe leaves this out from the exported data and assign upon import
+
 # nb! check that the result and log files point to the right locations
 # No log is currently written in this script
 ```
@@ -47,12 +49,23 @@ load(param$donationdata)
 
 ```{r load-and-process-data}
 simple = donationdata$donation %>%
-  filter(BloodDonationTypeKey %in% c('Whole Blood (K)','No Donation (E)')) %>%
-  left_join(simple,donationdata$donor[,c('releaseID','DateOfBirth','Sex','BloodGroup')],by='releaseID')
+  # filter(BloodDonationTypeKey %in% c('Whole Blood (K)','No Donation (E)')) %>%
+  # VisitNoDonation is used in Finland during the recent years instead of No Donation (E)
+  left_join(donationdata$donor[,c('releaseID','DateOfBirth','Sex','BloodGroup')],by='releaseID')
 simple$age= as.numeric(difftime(simple$DonationDate,simple$DateOfBirth),unit="weeks")/52.25
 simple$month = as.factor(month(simple$DonationDate))
 simple$year = year(simple$DonationDate)
 simple$year.factor = as.factor(simple$year)
+
+simple$limit=135
+simple$limit[simple$Sex=='Female']=125
+simple$deferred=0
+simple$deferred[simple$Hb<simple$limit]=1
+
+# donation0$limit=135
+# donation0$limit[donation0$Sex=='Female']=125
+# donation0$deferred=0
+# donation0$deferred[donation0$Hb<donation0$limit]=1
 
 # date of first donation
 date0 = simple %>%
@@ -77,39 +90,41 @@ donation.r = simple %>%
 ```{r prepare-for-export}
 # Annual Hb distributions by Sex
 data.sets=c('donation0','donation.r','simple')
-c.freq = NULL
+hb.freq = NULL
 for (ds in data.sets) {
-  freq = get(ds) %>%
+  freq0 = get(ds) %>%
     mutate(data.set=if(ds == 'simple') 'all' else ds) %>%
     group_by(data.set,year,Sex,Hb) %>%
-    summarise(n=n(),.groups='drop')
-  c.freq = if(is.null(c.freq)) freq else rbind(c.freq,freq)
+    summarise(n=n(),nas=sum(1*is.na(Hb)),deferred=sum(deferred,na.rm=TRUE),
+              mean.age=mean(age,na.rm=TRUE),sd.age=sd(age,na.rm=TRUE),.groups='drop')
+  hb.freq = if(is.null(hb.freq)) freq0 else rbind(hb.freq,freq0)
 }
 
 # Annual age distributions by Sex
 data.sets=c('donation0','donation.r','simple')
-c.age.freq = NULL
+age.freq = NULL
 for (ds in data.sets) {
-  freq = get(ds) %>%
+  freq0 = get(ds) %>%
     mutate(data.set=if(ds == 'simple') 'all' else ds,age=as.integer(age)) %>%
     group_by(data.set,year,Sex,age) %>%
-    summarise(n=n(),.groups='drop')
-  c.age.freq = if(is.null(c.freq)) freq else rbind(c.age.freq,freq)
+    summarise(n=n(),nas=sum(1*is.na(Hb)),deferred=sum(deferred,na.rm=TRUE),mean=mean(Hb,na.rm=TRUE),sd=sd(Hb,na.rm=TRUE),.groups='drop')
+  age.freq = if(is.null(freq)) freq0 else rbind(age.freq,freq0)
 }
 
 # Month statistics
-c.monthly = NULL
+monthly = NULL
 for (ds in data.sets) {
-  monthly = get(ds) %>%
+  monthly0 = get(ds) %>%
     mutate(data.set=ds) %>%
     group_by(data.set,year,Sex,month) %>%
-    summarise(n=n(),mean=mean(Hb,na.rm=TRUE),sd=sd(Hb,na.rm=TRUE),mean.age=mean(age,na.rm=TRUE),sd.age=sd(age,na.rm=TRUE),nas=sum(1*is.na(Hb)),.groups='drop') 
-  c.monthly = if(is.null(c.monthly)) monthly else rbind(c.monthly,monthly)
+    summarise(n=n(),nas=sum(1*is.na(Hb)),deferred=sum(deferred,na.rm=TRUE),mean=mean(Hb,na.rm=TRUE),sd=sd(Hb,na.rm=TRUE),
+              mean.age=mean(age,na.rm=TRUE),sd.age=sd(age,na.rm=TRUE),nas=sum(1*is.na(Hb)),.groups='drop') 
+  monthly = if(is.null(monthly)) monthly0 else rbind(monthly,monthly0)
 }
 ```
 
 ```{r export-data}
-write.xlsx(list(annual.hb=c.freq,annual.age=c.monthly,montly.statistics=c.monthly),file=file.path(param$wd,'exported-statistics.xlsx'))
+write.xlsx(list(annual.hb=hb.freq,annual.age=age.freq,montly.statistics=monthly),file=file.path(param$wd,'exported-statistics.xlsx'))
 ```
 
 This is the end of the new part.
@@ -196,129 +211,6 @@ plotYearSex = function(m,relative=FALSE) {
 }
 ```
 
-```{r}
-# Monthly averages from repeat donors
-seasonal = donation.r %>%
-  group_by(month) %>%
-  summarise(seasonal=mean(Hb,na.rm=TRUE),.groups='drop') %>%
-  mutate(month=as.integer(month))
-# The mutation above used to be in different context
-
-# repeat donations augmented with the seasonal data
-donation.r = inner_join(donation.r,seasonal,join_by(month))
-
-# 2025-04-05 This seems to be a reasoable regression for the year-sex adjustment factors
-# seasonal on tässä 146.451181
-m=lm(0+Hb~age+Sex+seasonal+year.factor:Sex,data=donation.r[donation.r$year>=2002,])
-sm=summary(m)
-r.mat=plotYearSex(m)
-# r.mat is used in a later block
-# r.adjustment is the relevant data now
-# adjustment is defined elsewhere, definition has been erased; the path kind of ends here.
-
-if (TRUE) {
-  adjustment=pivot_longer(cbind(Sex=rownames(r.mat)[1:2],r.mat[1:2,]),colnames(r.mat),names_to='year')
-  adjustment$year=as.integer(adjustment$year)
-  
-  str(seasonal)
-  seasonal$month=as.integer(seasonal$month)
-  str(adjustment)
-  str(donation0)
-}
-```
-
-
-```{r}
-# compute the adjusted data for first-time donations (?):
-# substract the unexplained effect (year x sex) estimated from 
-donation0a = donation0 %>%
-  mutate(month = as.integer(month)) %>%
-  inner_join(seasonal,join_by(month)) %>%
-  inner_join(adjustment,join_by(Sex,year)) %>%
-  mutate(Hb.adj = Hb - value)
-# alright, so here the r.mat values are subtracted from the Hb values
-# And what we get, are the annual effect
-# But these are kind of residuals then
-# So better use the rmat values as is done in the current computations
-
-donation0a$month.factor=as.factor(donation0a$month)
-
-summary(donation0a)
-
-# adjusted model
-m=lm(Hb.adj~0+Sex+age+year.factor:Sex+seasonal,data=donation0a[donation0a$year>=2005,])
-sm=summary(m)
-final=plotYearSex(m,relative=TRUE)
-estimateTrend(final)
-apply(final,1,min)
-apply(final,1,max)
-
-# unadjusted data
-m.final=lm(Hb~0+age+Sex+year.factor:Sex,data=donation0[donation0$year>=2005,])
-summary(m.final)
-final=plotYearSex(m.final) #,relative=TRUE)
-r.mat=plotYearSex(m)
-estimateTrend(final)
-```
-
-
-```{r}
-# annual = cbind(t(r.mat["Male",]),t(r.mat["Female",]))
-
-donation0$year=year(donation0$DonationDate)
-
-# donation0$year.factor = as.factor(donation0$year)
-str(donation0$year.factor)
-
-# Regressiomalleja
-
-m=lm(Hb~age+Sex+year,data=donation0)
-summary(m)
-
-m=lm(0+Hb~age+Sex+Sex:year,data=donation0)
-summary(m)
-
-m=lm(0+Hb~age+Sex+year.factor:Sex,data=donation0[donation0$year>=2005,])
-# m=lm(0+Hb~age+year.factor:Sex,data=donation0)
-summary(m)
-sm=summary(m)
-# plot(sm$coeff[4:nrow(sm$co),1])
-
-m=lm(Hb~year,data=donation0)
-summary(m)
-```
-
-```{r}
-hmm = simple %>%
-  filter(Sex=='Male') %>%
-  mutate(referred=(Hb<135),on.boundary=(Hb==135)) %>%
-  group_by(year) %>%
-  summarise(n=n(),n.referred=sum(referred,na.rm=TRUE),n.boundary=sum(on.boundary,na.rm=TRUE)) %>%
-  mutate(prop=n.referred/n,ratio=n.referred/n.boundary)
-plot(n.referred~year,data=hmm,type='l',lwd=3)
-plot(prop~year,data=hmm,type='l',lwd=3)
-plot(ratio~year,data=hmm,type='l',lwd=3,main='ratio of number referred to number at boundary (male/135)')
-
-simple %>%
-  group_by(BloodDonationTypeKey) %>%
-  summarise(n())
-
-str(simple)
-
-```
-
-
-```{r}
-
-# hist(male0$Hb)
-
-plotHbDist(donation0[donation0$DonationPlaceType=='Garrison'&donation0$age<100,],'Male',135,FALSE)
-
-plotHbDist(simple,'Male',135,FALSE)
-plotHbDist(simple,'Male',135,TRUE)
-plotHbDist(simple,'Female',125,FALSE)
-plotHbDist(simple,'Female',125,TRUE)
-```
 
 ```{r distribution-analysis}
 rectifyDistribution = function (data0,sex,cutoff,plot=TRUE) {
@@ -409,6 +301,22 @@ rectifyDistribution = function (data0,sex,cutoff,plot=TRUE) {
 
 ```
 
+```{r testing}
+donation0 %>%
+  filter(year>2015) %>%
+  group_by(year,Sex) %>%
+  summarise(mean(deferred),mean(Hb,na.rm=TRUE),sd=sd(Hb,na.rm=TRUE),nas=sum(1*is.na(Hb)))
+
+temp1 <-as.Date("01/01/2023",format="%m/%d/%Y")
+temp2 <-as.Date("01/01/2024",format="%m/%d/%Y")
+
+# DonationDate>=temp1,DonationDate<temp2
+dist.2023.male = simple %>%
+  filter(year(DonationDate)==2023,Hb<135,Sex=='Male')
+table(dist.2023.male$BloodDonationTypeKey)
+```
+
+
 The following chunk is to be preserved
 
 ```{r}
@@ -417,24 +325,65 @@ sex='Male'
 cutoff=125
 dist.male = rectifyDistribution(simple,'Male',cutoff)
 dist.female = rectifyDistribution(simple,'Female',cutoff)
+```
+
+```{r}
+getMoments = function(data,data.set='donation0',value.col='Hb',group.col='year',n.filter=100) {
+  # data = age.freq
+  data = data.frame(data)
+  
+  if (is.null(n.filter) || is.na(n.filter))
+    n.filter = 0
+  
+  wh = min(which(colnames(data)==value.col))
+  colnames(data)[wh]='value'
+  wh.group = min(which(colnames(data)==group.col))
+  colnames(data)[wh.group]='group'
+
+  new.basics.mean = data %>%
+    # filter(country=='FI') %>%
+    filter(data.set=='donation0',!is.na(value)) %>% # These are the summary rows for NA; leave them out at this point
+    group_by(group,Sex) %>%
+    summarise(n2=sum(n-nas),mean0=sum(value*(n-nas))/n2,.groups='drop')
+  
+  new.basics = data %>%
+    # filter(country=='FI') %>%
+    filter(data.set=='donation0',!is.na(value)) %>% # These are the summary rows for NA; leave them out at this point
+    # group_by(group,Sex) %>%
+    inner_join(new.basics.mean,join_by(group,Sex)) %>%
+    mutate(dev=value-mean0,prop=n/n2) %>%
+    group_by(group,Sex) %>%
+    summarise(mean=min(mean0),n0=min(n),n=min(n2),var=sum(prop*dev^2),sd=sqrt(var),
+              skewness=sum(prop*(dev/sd)^3),kurtosis=sum(prop*(dev/sd)^4),.groups='drop') %>%
+    mutate(sd.low=sqrt((n-1)*var/qchisq(c(.975), n-1))) %>%
+    mutate(sd.hi =sqrt((n-1)*var/qchisq(c(.0275), n-1))) %>%
+    mutate(mean.low=mean-qnorm(0.025)*sd/sqrt(n)) %>%
+    mutate(mean.hi =mean-qnorm(0.975)*sd/sqrt(n)) %>%
+    filter(n>n.filter) %>%
+    data.frame()
+  
+  # wh = min(which(colnames(new.basics)=='value'))
+  # colnames(new.basics)[wh]=value.col
+  wh.group = min(which(colnames(new.basics)=='group'))
+  colnames(new.basics)[wh.group]=group.col
+  
+  return(new.basics)
+}
+```
+
+
+```{r basics-processing}
+
 # Mitä tietoja oikeastaan tarvittaisiin: jakauma itsessään(~), mean1, sd1, error (suhde normaalijakaumaan), korjauksen summa
 # Jos ei plottaa, tämän saa kätevästi apply:lla (rivinumerot jos ei muu auta, kaivellaan sitten funktiossa esiin)
-
-simple$limit=135
-simple$limit[simple$Sex=='Female']=125
-simple$deferred=0
-simple$deferred[simple$Hb<simple$limit]=1
-
-donation0$limit=135
-donation0$limit[donation0$Sex=='Female']=125
-donation0$deferred=0
-donation0$deferred[donation0$Hb<donation0$limit]=1
 
 # pitäisikö käyttää myös donation.r erikseen? 
 # Voisi laskea kokeeksi siihenkin
 
 # simple$deferred[simple$Sex=='Female'&simple$Hb<125]=1
 # simple$deferred[simple$Sex=='Male'&simple$Hb<135]=1
+
+new.basics = getMoments(hb.freq,'donation0','Hb')
 
 basics = donation0 %>% # simple
   filter(!is.na(Hb)) %>%
@@ -482,15 +431,15 @@ basics$dperc0=pnorm(basics$limit,basics$mean0,basics$sd0)
 
 # r.mat.long=pivot_longer(r.mat,colnames(r.mat),names_to='year')
 # lm-adjusted means (year x sex)
-lm.data=pivot_longer(cbind(Sex=rownames(r.mat),r.mat)[1:2,],colnames(r.mat),names_to='year',values_to='mean.lm')
-lm.data$year=as.integer(lm.data$year)
-basics=left_join(basics,lm.data,join_by(year,Sex))
-basics$mean.lm[is.na(basics$mean.lm)]=0
+# lm.data=pivot_longer(cbind(Sex=rownames(r.mat),r.mat)[1:2,],colnames(r.mat),names_to='year',values_to='mean.lm')
+# lm.data$year=as.integer(lm.data$year)
+# basics=left_join(basics,lm.data,join_by(year,Sex))
+# basics$mean.lm[is.na(basics$mean.lm)]=0
 
 # Compute the first adjusted value (dperc.nrm) using the all time averages for Hb (grouped by sex)
 basics$dperc.nrm=pnorm(basics$limit+(basics$mean.year-basics$mean.all),basics$mean0,basics$sd0)
-basics$dperc.lm=pnorm(basics$limit+basics$mean.lm,basics$mean0,basics$sd0)
-basics$dperc.nrm.1=pnorm(basics$limit+(basics$mean.year-basics$mean.all),basics$mean1,basics$sd1)
+# basics$dperc.lm=pnorm(basics$limit+basics$mean.lm,basics$mean0,basics$sd0)
+# basics$dperc.nrm.1=pnorm(basics$limit+(basics$mean.year-basics$mean.all),basics$mean1,basics$sd1)
 
 sex.col=data.frame(sex=c('Female','Male'),col=c('Red','Blue'))
 
@@ -534,9 +483,8 @@ plotColBySex = function(basics,col,ylab,xvar='year') {
     }
   }
 }
-
-# Eli jos miehiiin sovellettaisiin vastaavaa hylkäysrajaa kuin naisilla (z-arvo), se olisi 138.8
-# Vastaavasti naisilla raja olisi 121.5
+# If and equivalent deferral limit would be applied to men as for women (z-value), the limit would be 138.8
+# Similarly for women, the deferrallimit would be 121.5
 ```
 
 ``` {r plotting}
@@ -550,12 +498,13 @@ plotColBySex(basics,'sd1','theoretical sd (adjusted)')
 plotColBySex(basics,'deferred.perc','actual percentage deferred')
 plotColBySex(basics,'dperc0','theoretical proportion deferred (unadjusted mean)')
 plotColBySex(basics,'dperc.nrm','theoretical proportion deferred (adjusted mean)')
-plotColBySex(basics,'dperc.lm','adjusted using estimated mean differences')
+# plotColBySex(basics,'dperc.lm','adjusted using estimated mean differences')
 ```
 
 ``` {r new-lm-approach}
 # This block relies on basics, so need to make sure it can be computed with the summary data
-# Plus must add countries
+# Plus must add countries overall
+# This all seems to be based on basics
 par(mar=c(2,4,0,0))
 data=basics[basics$Sex=='Female',]
 data.female=data
@@ -596,11 +545,19 @@ summary(m1)
 m1=lm(deferred.perc~mean1+sd1+age,data=data.female)
 summary(m1)
 ```
+
 ```{r statistics-by-age}
+
+new.agedist = getMoments(age.freq,data.set='all',value.col='mean',group.col='age',n.filter=100)
+plotColBySex(new.agedist,'mean',xvar = 'age',ylab='')
+  
+# Tässä itse asiassa lasketaan vuosikohtaisesti perusparametrit, erona vaan että luottamusvälit lisäksi
 agedist = simple %>%
   mutate(age=as.integer(age)) %>%
   filter(!is.na(Hb),age<=70) %>%
-  filter(DonationPlaceType!='Garrison') %>%
+  # nb! This is a pitfall, maybe should be done in other contexts as well for consistency
+  # Maybe should manage this somehow differently
+  filter(DonationPlaceType!='Garrison') %>% 
   group_by(age,Sex) %>%
   summarise(mean=mean(Hb),sd=sd(Hb,na.rm=TRUE),v=var(Hb),n=n(),.groups='drop') %>%
   mutate(sd.low=sqrt((n-1)*v/qchisq(c(.975), n-1))) %>%
@@ -620,49 +577,7 @@ plotColBySex(basics,'age',xvar='year',ylab='age by year')
 # Mutta koska Hb on oleellisesti lineaarinen iän suhteen (pl. varuskuntaluovuttajat), voi silti käyttää keski-ikää
 ```
 
-Chunks below this point are old and probably obsolete.
-
 ```{r}
-# These have been copied to the chunk above
-mean1=  freq2 %>% 
-    mutate(mom=Hb*prop) %>%
-    summarise(mean=sum(mom))
-mean1-mean0
-mean1=as.numeric(mean1)
-sd1 =  freq2 %>% 
-    mutate(mom=(Hb-as.numeric(mean1))^2*prop) %>%
-    summarise(sdx=sum(mom)) 
-sd1=sqrt(as.numeric(sd1))
-sd1-sd0
-```
-
-
-```{r}
-donation0 %>% filter(Hb<135,Sex=='Male')
-
-skewness(freq$n)
-shapiro.test(freq$n)
 
 ```
 
-
-```{r normal-distribution-parameter-testing}
-vavg=155
-stdev=11
-
-diff=seq(-5,2,0.1)
-y=pnorm(135+diff,mean=avg,sd=stdev)
-wh0=which(diff==0) 
-y=y/y[wh0]
-plot(y~diff,xlab='difference in mean',ylab=paste0('ratio between mean+diff and mean=',avg))
-abline(v=0,lty='dashed')
-
-diff=seq(-1,3,0.05)
-y=pnorm(135,mean=avg,sd=stdev+diff)
-wh0=which(diff==0)
-y=y/y[wh0]
-plot(y~diff,xlab='difference in stdev',ylab=paste0('ratio between stdev+diff and stdev=',stdev))
-abline(v=0,lty='dashed')
-# Riippuvuus ei ole lineaarinen
-# abline(a=y[wh0],b=(y[length(y)]-y[1])/(diff[length(diff)]-diff[1]))
-```
