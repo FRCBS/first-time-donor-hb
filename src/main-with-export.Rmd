@@ -327,33 +327,58 @@ dist.male = rectifyDistribution(simple,'Male',cutoff)
 dist.female = rectifyDistribution(simple,'Female',cutoff)
 ```
 
-```{r}
-getMoments = function(data,data.set='donation0',value.col='Hb',group.col='year',n.filter=100) {
+```{r age-fractions}
+# in development, to be integrated in getMoments
+breaks = c(-Inf,24,40,Inf)
+labels = c('young','mid','old')
+cut(16:70,breaks=breaks)
+age.freq$age.group = cut(age.freq$age,breaks)
+age.freq = age.freq %>% dplyr::select(-age.group)
+str(age.freq)
+
+year.totals = age.freq %>%
+  group_by(year,Sex) %>%
+  summarise(n2=sum(n),.groups='drop')
+
+age2 = age.freq %>%
+  mutate(group = cut(age,breaks,labels=labels)) %>%
+  group_by(year,Sex,group) %>%
+  summarise(n=sum(n),.groups='drop') %>%
+  inner_join(year.totals,join_by(year,Sex)) %>%
+  mutate(prop=n/n2) %>% # ,name=paste(year,Sex)) %>%
+  pivot_wider(id_cols=c('year','Sex'),names_from='group',values_from='prop')
+age2
+?pivot_wider
+```
+
+
+```{r getmoments-function}
+getMoments = function(freq,data.set='donation0',value.col='Hb',group.col='year',n.filter=100,age.freq=NULL,age.breaks=c(-Inf,24,40,Inf),age.labels=c('young','mid','old')) {
   # data = age.freq
-  data = data.frame(data)
+  freq = data.frame(freq)
   
   if (is.null(n.filter) || is.na(n.filter))
     n.filter = 0
   
-  wh = min(which(colnames(data)==value.col))
-  colnames(data)[wh]='value'
-  wh.group = min(which(colnames(data)==group.col))
-  colnames(data)[wh.group]='group'
+  wh = min(which(colnames(freq)==value.col))
+  colnames(freq)[wh]='value'
+  wh.group = min(which(colnames(freq)==group.col))
+  colnames(freq)[wh.group]='group'
 
-  new.basics.mean = data %>%
+  new.basics.mean = freq %>%
     # filter(country=='FI') %>%
     filter(data.set=='donation0',!is.na(value)) %>% # These are the summary rows for NA; leave them out at this point
     group_by(group,Sex) %>%
-    summarise(n2=sum(n-nas),mean0=sum(value*(n-nas))/n2,.groups='drop')
+    summarise(n2=sum(n-nas),deferred.prop=sum(deferred/n2),mean0=sum(value*(n-nas))/n2,.groups='drop')
   
-  new.basics = data %>%
+  new.basics = freq %>%
     # filter(country=='FI') %>%
     filter(data.set=='donation0',!is.na(value)) %>% # These are the summary rows for NA; leave them out at this point
     # group_by(group,Sex) %>%
     inner_join(new.basics.mean,join_by(group,Sex)) %>%
     mutate(dev=value-mean0,prop=n/n2) %>%
     group_by(group,Sex) %>%
-    summarise(mean=min(mean0),n0=min(n),n=min(n2),var=sum(prop*dev^2),sd=sqrt(var),
+    summarise(mean=min(mean0),n0=min(n),n=min(n2),deferred.prop=min(deferred.prop),var=sum(prop*dev^2),sd=sqrt(var),
               skewness=sum(prop*(dev/sd)^3),kurtosis=sum(prop*(dev/sd)^4),.groups='drop') %>%
     mutate(sd.low=sqrt((n-1)*var/qchisq(c(.975), n-1))) %>%
     mutate(sd.hi =sqrt((n-1)*var/qchisq(c(.0275), n-1))) %>%
@@ -366,6 +391,26 @@ getMoments = function(data,data.set='donation0',value.col='Hb',group.col='year',
   # colnames(new.basics)[wh]=value.col
   wh.group = min(which(colnames(new.basics)=='group'))
   colnames(new.basics)[wh.group]=group.col
+  
+  if (!is.null(age.freq)) {
+    year.totals = age.freq %>%
+      group_by(year,Sex) %>%
+      summarise(n2=sum(n),age=mean(age),.groups='drop')
+    
+    age2 = age.freq %>%
+      mutate(group = cut(age,breaks,labels=labels)) %>%
+      group_by(year,Sex,group) %>%
+      summarise(n=sum(n),.groups='drop') %>%
+      inner_join(year.totals,join_by(year,Sex)) %>%
+      mutate(prop=n/n2) %>% # ,name=paste(year,Sex)) %>%
+      pivot_wider(id_cols=c('year','Sex'),names_from='group',values_from='prop')
+
+
+    new.basics = new.basics %>%
+      inner_join(age2,join_by(year,Sex)) %>%
+      inner_join(year.totals[,c('year','Sex','age')],join_by(year,Sex))
+  }
+
   
   return(new.basics)
 }
@@ -383,23 +428,23 @@ getMoments = function(data,data.set='donation0',value.col='Hb',group.col='year',
 # simple$deferred[simple$Sex=='Female'&simple$Hb<125]=1
 # simple$deferred[simple$Sex=='Male'&simple$Hb<135]=1
 
-new.basics = getMoments(hb.freq,'donation0','Hb')
+new.basics = getMoments(hb.freq,'donation0','Hb',age.freq=age.freq)
 
 basics = donation0 %>% # simple
   filter(!is.na(Hb)) %>%
   group_by(year,Sex) %>%
-  summarise(n=n(),mean0=mean(Hb,na.rm=TRUE),sd0=sd(Hb,na.rm=TRUE),deferred.perc=sum(deferred)/n(),
+  summarise(n=n(),mean0=mean(Hb,na.rm=TRUE),sd0=sd(Hb,na.rm=TRUE),deferred.prop=sum(deferred)/n(),
             limit=min(limit),age=mean(age),.groups='drop')
 
 basics.all = simple %>% # simple
   filter(!is.na(Hb)) %>%
   group_by(year,Sex) %>%
-  summarise(n=n(),mean.year=mean(Hb,na.rm=TRUE),sd0=sd(Hb,na.rm=TRUE),deferred.perc=sum(deferred)/n(),limit=min(limit),.groups='drop')
+  summarise(n=n(),mean.year=mean(Hb,na.rm=TRUE),sd0=sd(Hb,na.rm=TRUE),deferred.prop=sum(deferred)/n(),limit=min(limit),.groups='drop')
 
 true.basics = simple %>%
   filter(!is.na(Hb)) %>%
   group_by(Sex) %>%
-  summarise(n=n(),mean.all=mean(Hb,na.rm=TRUE),sd0=sd(Hb,na.rm=TRUE),deferred.perc=sum(deferred)/n(),limit=min(limit),.groups='drop')
+  summarise(n=n(),mean.all=mean(Hb,na.rm=TRUE),sd0=sd(Hb,na.rm=TRUE),deferred.prop=sum(deferred)/n(),limit=min(limit),.groups='drop')
 true.basics$z=with(true.basics,(limit-mean.all)/sd0)
 true.basics=data.frame(true.basics)
 rownames(true.basics)=true.basics$Sex
@@ -495,56 +540,77 @@ plotColBySex(basics,'sd0','sd (actual data)')
 plotColBySex(basics,'sd1','theoretical sd (adjusted)')
 
 # deferral rates
-plotColBySex(basics,'deferred.perc','actual percentage deferred')
+plotColBySex(basics,'deferred.prop','actual percentage deferred')
 plotColBySex(basics,'dperc0','theoretical proportion deferred (unadjusted mean)')
 plotColBySex(basics,'dperc.nrm','theoretical proportion deferred (adjusted mean)')
 # plotColBySex(basics,'dperc.lm','adjusted using estimated mean differences')
 ```
 
 ``` {r new-lm-approach}
-# This block relies on basics, so need to make sure it can be computed with the summary data
-# Plus must add countries overall
-# This all seems to be based on basics
-par(mar=c(2,4,0,0))
-data=basics[basics$Sex=='Female',]
-data.female=data
-mean.female=mean(data$deferred.perc)
-plot(deferred.perc~mean1,data=data,ylim=c(0,0.15),xlim=c(130,160),col='red')
-m=lm(deferred.perc~mean1,data=data)
-m1=lm(deferred.perc~mean1+sd1,data=data)
-sm=summary(m)
-sm1=summary(m1)
-sm1.female=sm1
-# prd=predict(m,newdata=data)
-# lines(data$mean1,as.vector(prd))
-abline(a=sm$coeff[1,1],b=sm$coeff[2,1],col='red',lty='dashed',lwd=2)
-text(x=135,y=0.03,labels=paste0('b=',round(sm1$coeff[2,1],3),'\np=',round(sm1$coeff[2,4],3),'\nR',intToUtf8(178),'=',round(sm1$r.squared,3)),adj=c(0))
-data=basics[basics$Sex=='Male',]
-m=lm(deferred.perc~mean1,data=data)
-m1=lm(deferred.perc~mean1+sd1,data=data)
-sm=summary(m)
-sm1=summary(m1)
-abline(a=sm$coeff[1,1],b=sm$coeff[2,1],col='blue',lty='dashed',lwd=2)
-points(data$mean1,data$deferred.perc,col='blue')
-text(x=155,y=0.06,labels=paste0('b=',round(sm1$coeff[2,1],3),'\np=',round(sm1$coeff[2,4],3),'\nR',intToUtf8(178),'=',round(sm1$r.squared,3)),adj=c(0))
-plot(data$year,sm1.female$residuals,col='red',ylim=c(-0.05,0.05),type='l',ylab='residuals',lwd=3)
-lines(data$year,sm1$residuals,col='blue',lwd=3)
-mean.male=mean(data$deferred.perc)
-lines(data$year,data.female$deferred.perc-mean.female,col='red',lty='dotted',lwd=2)
-lines(data$year,data$deferred.perc-mean.male,col='blue',lty='dotted',lwd=2)
+newLMapproach = function(basics) {
+  # This block relies on basics, so need to make sure it can be computed with the summary data
+  # Plus must add countries overall
+  # This all seems to be based on basics
+  par(mar=c(2,4,0,0))
+  data=basics[basics$Sex=='Female',]
+  data.female=data
+  mean.female=mean(data$deferred.prop)
+  plot(deferred.prop~mean,data=data,ylim=c(0,0.15),xlim=c(130,160),col='red')
+  m=lm(deferred.prop~mean,data=data)
+  m1=lm(deferred.prop~mean+sd,data=data)
+  sm=summary(m)
+  sm1=summary(m1)
+  sm1.female=sm1
+  
+  m2.female=NULL
+  if ('young' %in% colnames(data)) {
+    m2.female=lm(deferred.prop~mean+sd+young+old,data=data)
+  }
 
-year=data$year
-residual=data.female$deferred.perc-mean.female
-m=lm(residual~year)
-summary(m)
+    abline(a=sm$coeff[1,1],b=sm$coeff[2,1],col='red',lty='dashed',lwd=2)
+  text(x=135,y=0.03,labels=paste0('b=',round(sm1$coeff[2,1],3),'\np=',round(sm1$coeff[2,4],3),'\nR',intToUtf8(178),'=',round(sm1$r.squared,3)),adj=c(0))
+  data=basics[basics$Sex=='Male',]
+  m=lm(deferred.prop~mean,data=data)
+  m1=lm(deferred.prop~mean+sd,data=data)
+  sm=summary(m)
+  sm1=summary(m1)
+  abline(a=sm$coeff[1,1],b=sm$coeff[2,1],col='blue',lty='dashed',lwd=2)
+  points(data$mean,data$deferred.prop,col='blue')
+  text(x=155,y=0.06,labels=paste0('b=',round(sm1$coeff[2,1],3),'\np=',round(sm1$coeff[2,4],3),'\nR',intToUtf8(178),'=',round(sm1$r.squared,3)),adj=c(0))
+  plot(data$year,sm1.female$residuals,col='red',ylim=c(-0.05,0.05),type='l',ylab='residuals',lwd=3)
+  lines(data$year,sm1$residuals,col='blue',lwd=3)
+  mean.male=mean(data$deferred.prop)
+  lines(data$year,data.female$deferred.prop-mean.female,col='red',lty='dotted',lwd=2)
+  lines(data$year,data$deferred.prop-mean.male,col='blue',lty='dotted',lwd=2)
+  
+  year=data$year
+  residual=data.female$deferred.prop-mean.female
+  m=lm(residual~year)
+  summary(m)
+  
+  table(data$Sex)
+  m1=lm(deferred.prop~mean+sd+age,data=data)
+  summary(m1)
+  
+  m1=lm(deferred.prop~mean+sd+age,data=data.female)
+  summary(m1)
 
-table(data$Sex)
-m1=lm(deferred.perc~mean1+sd1+age,data=data)
-summary(m1)
-
-m1=lm(deferred.perc~mean1+sd1+age,data=data.female)
-summary(m1)
+  m2.male=NULL
+  if ('young' %in% colnames(data)) {
+    m2.male=lm(deferred.prop~mean+sd+young+old,data=data)
+  }
+  
+  return(list(m.female=m2.female,m.male=m2.male))
+}
 ```
+
+```{r}
+rv=newLMapproach(new.basics)
+str(rv$m.female)
+summary(rv$m.female)
+summary(rv$m.male)
+```
+
 
 ```{r statistics-by-age}
 
