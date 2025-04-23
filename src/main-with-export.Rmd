@@ -33,7 +33,6 @@ dir.create(file.path(param$wd,"log"),showWarnings = FALSE)
 param$result.file = file.path(param$wd,"results","data.xlsx")
 
 param$donationdata = 'C:/git_repot/DATA/donationdata.fortimo.rdata'
-
 param$country = 'FI' # Maybe leaves this out from the exported data and assign upon import
 
 # nb! check that the result and log files point to the right locations
@@ -107,7 +106,7 @@ for (ds in data.sets) {
   freq0 = get(ds) %>%
     mutate(data.set=if(ds == 'simple') 'all' else ds,age=as.integer(age)) %>%
     group_by(data.set,year,Sex,age) %>%
-    summarise(n=n(),nas=sum(1*is.na(Hb)),deferred=sum(deferred,na.rm=TRUE),mean=mean(Hb,na.rm=TRUE),sd=sd(Hb,na.rm=TRUE),.groups='drop')
+    summarise(n=n(),nas=sum(1*is.na(Hb)),deferred=sum(deferred,na.rm=TRUE),mean.hb=mean(Hb,na.rm=TRUE),sd.hb=sd(Hb,na.rm=TRUE),.groups='drop')
   age.freq = if(is.null(freq)) freq0 else rbind(age.freq,freq0)
 }
 
@@ -122,6 +121,12 @@ for (ds in data.sets) {
   monthly = if(is.null(monthly)) monthly0 else rbind(monthly,monthly0)
 }
 ```
+
+Open questions:
+- What to do with the garrison donations?
+- What to do with the NA's?
+- Should the lower parts be somehow masked: is there a risk of leaking personal data?
+
 
 ```{r export-data}
 write.xlsx(list(annual.hb=hb.freq,annual.age=age.freq,montly.statistics=monthly),file=file.path(param$wd,'exported-statistics.xlsx'))
@@ -209,6 +214,7 @@ plotYearSex = function(m,relative=FALSE) {
   axis(side=1,at=1:ncol(pah.all),labels=colnames(pah.all))
   return(pah.all)
 }
+new.basics
 ```
 
 
@@ -317,43 +323,17 @@ table(dist.2023.male$BloodDonationTypeKey)
 ```
 
 
-The following chunk is to be preserved
-
 ```{r}
 data0=simple
 sex='Male'
-cutoff=125
+cutoff=135
 dist.male = rectifyDistribution(simple,'Male',cutoff)
 dist.female = rectifyDistribution(simple,'Female',cutoff)
 ```
 
-```{r age-fractions}
-# in development, to be integrated in getMoments
-breaks = c(-Inf,24,40,Inf)
-labels = c('young','mid','old')
-cut(16:70,breaks=breaks)
-age.freq$age.group = cut(age.freq$age,breaks)
-age.freq = age.freq %>% dplyr::select(-age.group)
-str(age.freq)
 
-year.totals = age.freq %>%
-  group_by(year,Sex) %>%
-  summarise(n2=sum(n),.groups='drop')
-
-age2 = age.freq %>%
-  mutate(group = cut(age,breaks,labels=labels)) %>%
-  group_by(year,Sex,group) %>%
-  summarise(n=sum(n),.groups='drop') %>%
-  inner_join(year.totals,join_by(year,Sex)) %>%
-  mutate(prop=n/n2) %>% # ,name=paste(year,Sex)) %>%
-  pivot_wider(id_cols=c('year','Sex'),names_from='group',values_from='prop')
-age2
-?pivot_wider
-```
-
-
-```{r getmoments-function}
-getMoments = function(freq,data.set='donation0',value.col='Hb',group.col='year',n.filter=100,age.freq=NULL,age.breaks=c(-Inf,24,40,Inf),age.labels=c('young','mid','old')) {
+```{r getStats-function}
+getStats = function(freq,data.set='donation0',value.col='Hb',group.col='year',n.filter=100,age.freq=NULL,age.breaks=c(-Inf,24,40,Inf),age.labels=c('young','mid','old')) {
   # data = age.freq
   freq = data.frame(freq)
   
@@ -428,7 +408,7 @@ getMoments = function(freq,data.set='donation0',value.col='Hb',group.col='year',
 # simple$deferred[simple$Sex=='Female'&simple$Hb<125]=1
 # simple$deferred[simple$Sex=='Male'&simple$Hb<135]=1
 
-new.basics = getMoments(hb.freq,'donation0','Hb',age.freq=age.freq)
+new.basics = getStats(hb.freq,'donation0','Hb',age.freq=age.freq)
 
 basics = donation0 %>% # simple
   filter(!is.na(Hb)) %>%
@@ -604,21 +584,23 @@ newLMapproach = function(basics) {
 }
 ```
 
-```{r}
+```{r experimental-results}
+# Do the young and old age proportions explain deferral rates:
+# They do, but only for men 
 rv=newLMapproach(new.basics)
-str(rv$m.female)
 summary(rv$m.female)
 summary(rv$m.male)
+
+plotColBySex(new.basics,'old','proportion')
 ```
 
 
 ```{r statistics-by-age}
-
-new.agedist = getMoments(age.freq,data.set='all',value.col='mean',group.col='age',n.filter=100)
+agedist = getStats(age.freq,data.set='all',value.col='mean.hb',group.col='age',n.filter=100)
 plotColBySex(new.agedist,'mean',xvar = 'age',ylab='')
   
 # Tässä itse asiassa lasketaan vuosikohtaisesti perusparametrit, erona vaan että luottamusvälit lisäksi
-agedist = simple %>%
+old.agedist = simple %>%
   mutate(age=as.integer(age)) %>%
   filter(!is.na(Hb),age<=70) %>%
   # nb! This is a pitfall, maybe should be done in other contexts as well for consistency
