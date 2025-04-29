@@ -1,4 +1,4 @@
----
+# ---
 title: "Hemoglobin distributions and trends"
 author: "Timo Asikainen"
 date: "2025-02-20" 
@@ -33,8 +33,12 @@ dir.create(file.path(param$wd,"log"),showWarnings = FALSE)
 param$result.file = file.path(param$wd,"results","data.xlsx")
 
 # nb! Change this to point to the correct data 
-param$donationdata = 'C:/git_repot/DATA/donationdata.fortimo.rdata'
-param$country = 'FI' # Not used currently; country could also be assigned when reading in the various data
+param$donationdata = '/home/m.pothast/data/data.rdata'
+param$country = 'NL' # Not used currently; country could also be assigned when reading in the various data
+param$units = 'mmol/L' #or g/L or g/dL
+param$cutoff_M <- 8.4 #will need to convert these to correct units
+param$cutoff_F <- 7.8
+CONVERTED = F
 ```
 
 ```{r load-data}
@@ -44,8 +48,42 @@ load(param$donationdata)
 ```
 
 
-```{r load-and-process-data}
+```{r convert to correct units}
+
+#should set some values to NA, but these cuts are unit specific!
+
+Hb <- donationdata$donation$Hb
+
+Hb <- as.numeric(Hb) 
+if (!CONVERTED){
+  if (param$units == 'mmol/L'){
+    #If mmol/L assume that there is only 1 decimal. So add a random number
+    # between -0.05, 0.05 such that all Hb values in g/L exists 
+    #if you do not do these you get weird jumps
+    Hb <- round((round(Hb, 1)+0.1*(runif(length(Hb))-0.5))/0.0621)
+    param$cutoff_M <- round(param$cutoff_M/0.0621)
+    param$cutoff_F <- round(param$cutoff_F/0.0621)
+    CONVERTED <- T
+  } else if (param$units == 'g/dL'){
+    Hb <- round(Hb * 10)
+    param$cutoff_M <- round(param$cutoff_M*10)
+    param$cutoff_F <- round(param$cutoff_F*10)
+    CONVERTED <- T
+  } else {
+    stop("param$units should be any of [mmol/L, g/dL, g/L]")
+  }
+}
+donationdata$donation$Hb <- Hb
+```
+
+```{r load-and-prcoess-data}
+
+#Set very small or large values to nan (all in units g/L, but Hb is converted above)
+is.na(donationdata$donation$Hb) <- donationdata$donation$Hb > 300
+is.na(donationdata$donation$Hb) <- donationdata$donation$Hb < 1
+
 simple = donationdata$donation %>%
+  filter(!is.na(Hb)) %>% #filter NA's
   # filter(BloodDonationTypeKey %in% c('Whole Blood (K)','No Donation (E)')) %>%
   # VisitNoDonation is used in Finland during the recent years instead of No Donation (E)
   left_join(donationdata$donor[,c('releaseID','DateOfBirth','Sex','BloodGroup')],by='releaseID')
@@ -54,34 +92,40 @@ simple$month = as.factor(month(simple$DonationDate))
 simple$year = year(simple$DonationDate)
 simple$year.factor = as.factor(simple$year)
 
-simple$limit=135
-simple$limit[simple$Sex=='Female']=125
+
+simple$limit = param$cutoff_M
+simple$limit[simple$Sex=='Female'] = param$cutoff_F
 simple$deferred=0
 simple$deferred[simple$Hb<simple$limit]=1
 
+#Filter nan sex
+simple <- simple %>% filter(!is.na(Sex))
+
+#For NL should take only BloodDonationTypeKey == "N" for first donation
 # date of first donation
 date0 = simple %>%
+  filter(BloodDonationTypeKey == "New") %>%
   group_by(releaseID) %>%
   summarise(date0=min(DonationDate),.groups='drop')
-
-# first-time donations
+# 
+# # first-time donations
 donation0 = simple %>%
   inner_join(date0,join_by(x$DonationDate==y$date0,releaseID))
 
-# repeat donations; sent for sentinel
-donation.r = simple %>%
-  left_join(cbind(date0,sent=1),join_by(x$DonationDate==y$date0,releaseID)) %>%
-  filter(is.na(sent)) %>%
-  select(-sent) %>%
-  mutate(month=as.integer(month))
-
+# # repeat donations; sent for sentinel
+# donation.r = simple %>%
+#   left_join(cbind(date0,sent=1),join_by(x$DonationDate==y$date0,releaseID)) %>%
+#   filter(is.na(sent)) %>%
+#   select(-sent) %>%
+#   mutate(month=as.integer(month))
+# 
 # donation0$year=year(donation0$DonationDate)
 # donation0$year.factor=as.factor(donation0$year)
 ```
 
 ```{r prepare-for-export}
 # Annual Hb distributions by Sex
-data.sets=c('donation0','donation.r','simple')
+data.sets=c('donation0')#,'donation.r','simple')
 hb.freq = NULL
 for (ds in data.sets) {
   freq0 = get(ds) %>%
@@ -93,7 +137,7 @@ for (ds in data.sets) {
 }
 
 # Annual age distributions by Sex
-data.sets=c('donation0','donation.r','simple')
+# data.sets=c('donation0','donation.r','simple')
 age.freq = NULL
 for (ds in data.sets) {
   freq0 = get(ds) %>%
@@ -251,7 +295,8 @@ rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL) 
       } else
         sex = unique(data0$Sex)[1]
     } 
-    cutoff = if (sex=='Female') 125 else 135
+    #TODO: no hard-code
+    cutoff = if (sex=='Female') param$cutoff_F else param$cutoff_M
   }
 
   if (!is.null(data0)) {
@@ -270,7 +315,7 @@ rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL) 
   
   if (!'prop' %in% colnames(freq)) {
     sum.n = sum(freq$n) # -coalesce(freq$nas,0))
-    freq$prop = freq$n / sum.n
+    freq$prop = freq$n / sum.n 
   }
   
   freq.mean = freq %>%
@@ -287,7 +332,8 @@ rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL) 
   sd0 = freq.stats$sd
 
   Hb.values = sort(unique(freq$Hb))
-  ndist=dnorm(Hb.values,mean=mean0,sd=sd0)
+  dx <- 1. #depends on units, but should now all be converted to g/L
+  ndist=dnorm(Hb.values,mean=mean0,sd=sd0)*dx
   
   # Plotting the unchanged distribution
   if (plot) {
@@ -341,17 +387,19 @@ rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL) 
       summarise(sdx=sum(mom)) 
   sd1=sqrt(as.numeric(sd1))
   
-  # The theoretical deferred proportion is computed here
+  # The theoretical deferred proportion is computed here 
+  #the cutoff-0.5 is unit specific for g/L
   deferred.prop = pnorm(cutoff-0.5,mean1,sd1)
-
+# 
   if (plot) {
-    plot(prop~Hb,data=freq2,type='l',lwd=3,xlim=NULL)
-    ndist2=dnorm(Hb.values,mean=mean1,sd=sd1)
+    plot(prop~Hb,data=freq,type='l',lwd=3,xlim=NULL)
+    lines(prop~Hb,data=freq2,col='green', lwd=2)
+    ndist2=dnorm(Hb.values,mean=mean1,sd=sd1)*dx
     lines(Hb.values,ndist2,col='red',lty='dotted',lwd=2)
     abline(v=cutoff,col='blue',lty='dashed')
-    rect(mean1-5,0,mean1+5,0.001,col='pink',lwd=2)
+    rect(mean1-0.1,0,mean1+0.1,0.001,col='pink',lwd=2) #TODO: fix hard code limits
     abline(v=mean1,lty='dotted',lwd=3)
-    
+
     plot(freq2$prop-ndist2~Hb.values)
     abline(v=cutoff,col='blue',lty='dashed')
     abline(h=c(-1,1)*0.0005,col='red',lty='dashed')
@@ -368,7 +416,11 @@ data0=simple
 sex='Male'
 cutoff=135
 
-rectifyDistribution(NULL,'Female',125,freq=hb.freq[hb.freq$Sex=='Female',])
+freq <- hb.freq[hb.freq$Sex=='Female', ]
+# sum.n = sum(freq$n) # -coalesce(freq$nas,0))
+# freq$prop = freq$n / sum.n
+
+rectifyDistribution(NULL,'Female',param$cutoff_F,freq=freq)
 
 # dist.male = rectifyDistribution(simple,'Male',cutoff)
 # dist.female = rectifyDistribution(simple,'Female',cutoff)
