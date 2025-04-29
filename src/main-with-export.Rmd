@@ -165,7 +165,7 @@ Open questions:
 - Should the lower parts be somehow masked: is there a risk of leaking personal data?
 
 ```{r export-data}
-write.xlsx(list(annual.hb=hb.freq,annual.age=age.freq,montly.statistics=monthly),file=file.path(param$wd,'exported-statistics.xlsx'))
+write.xlsx(list(annual.hb=hb.freq %>% filter(n > 20),annual.age=age.freq %>% filter(n > 20),montly.statistics=monthly %>% filter(n > 20)),file=file.path(param$wd,'exported-statistics.xlsx'))
 ```
 
 This is the end of the processing and export part.
