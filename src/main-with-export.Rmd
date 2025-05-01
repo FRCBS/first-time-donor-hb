@@ -35,6 +35,13 @@ param$result.file = file.path(param$wd,"results","data.xlsx")
 # nb! Change this to point to the correct data 
 param$donationdata = 'C:/git_repot/DATA/donationdata.fortimo.rdata'
 param$country = 'FI' # Not used currently; country could also be assigned when reading in the various data
+param$units = 'g/L' # one of: mmol/L, or g/L or g/dL
+param$cutoff.male = 135 # 8.4 # will need to convert these to correct units
+param$cutoff.female = 125 # 7.8
+param$data.sets = c('donation0','donation.r','simple')
+param$include.na = TRUE
+param$minimum.group.size = 5
+# CONVERTED = F
 ```
 
 ```{r load-data}
@@ -46,6 +53,8 @@ load(param$donationdata)
 
 ```{r load-and-process-data}
 simple = donationdata$donation %>%
+  filter(param$include.na || !is.na(Hb)) %>%
+  # filter(!is.na(Hb)) %>% #filter NA's # TODO must decide whether to keep or leave
   # filter(BloodDonationTypeKey %in% c('Whole Blood (K)','No Donation (E)')) %>%
   # VisitNoDonation is used in Finland during the recent years instead of No Donation (E)
   left_join(donationdata$donor[,c('releaseID','DateOfBirth','Sex','BloodGroup')],by='releaseID')
@@ -54,13 +63,19 @@ simple$month = as.factor(month(simple$DonationDate))
 simple$year = year(simple$DonationDate)
 simple$year.factor = as.factor(simple$year)
 
-simple$limit=135
-simple$limit[simple$Sex=='Female']=125
+
+simple$limit = param$cutoff.male
+simple$limit[simple$Sex=='Female'] = param$cutoff.female
 simple$deferred=0
 simple$deferred[simple$Hb<simple$limit]=1
 
+#Filter nan sex
+simple <- simple %>% filter(!is.na(Sex))
+
+#For NL should take only BloodDonationTypeKey == "N" for first donation
 # date of first donation
 date0 = simple %>%
+  filter(param$country != 'NL' || BloodDonationTypeKey == "New") %>%
   group_by(releaseID) %>%
   summarise(date0=min(DonationDate),.groups='drop')
 
@@ -81,7 +96,7 @@ donation.r = simple %>%
 
 ```{r prepare-for-export}
 # Annual Hb distributions by Sex
-data.sets=c('donation0','donation.r','simple')
+data.sets= param$data.sets # c('donation0','donation.r','simple')
 hb.freq = NULL
 for (ds in data.sets) {
   freq0 = get(ds) %>%
@@ -94,16 +109,17 @@ for (ds in data.sets) {
 
 anonymizeDistribution = function(freq) {
   # freq = hb.freq
-  wh.sub = which(freq$n < 5 & freq$Hb < freq$limit)
-  wh.super = which(freq$n < 5 & freq$Hb > freq$limit)
+  hb.inf = 1e6
+  wh.sub = which(freq$n < param$minimum.group.size & freq$Hb < freq$limit)
+  wh.super = which(freq$n < param$minimum.group.size & freq$Hb > freq$limit)
   
-  freq$Hb[wh.sub] = -1e6
-  freq$Hb[wh.super] = 1e6
+  freq$Hb[wh.sub] = -hb.inf
+  freq$Hb[wh.super] = hb.inf
   
   aggregated = freq[c(wh.sub,wh.super),] %>%
     mutate(sgn=sign(Hb)) %>%
     group_by(data.set,year,Sex,sgn) %>%
-    summarise(Hb=min(sgn)*1e6,n2=sum(n),nas=sum(nas),deferred=sum(deferred),
+    summarise(Hb=min(sgn)*hb.inf,n2=sum(n),nas=sum(nas),deferred=sum(deferred),
               mean.age=sum(n*mean.age)/sum(n),sd.age=NA,limit=min(limit),.groups='drop') %>%
     dplyr::select(-sgn) %>%
     rename(n=n2)
@@ -144,7 +160,9 @@ Open questions:
 - Should the lower parts be somehow masked: is there a risk of leaking personal data?
 
 ```{r export-data}
-write.xlsx(list(annual.hb=hb.freq,annual.age=age.freq,montly.statistics=monthly),file=file.path(param$wd,'results','exported-statistics.xlsx'))
+write.xlsx(list(annual.hb=hb.freq,annual.age=age.freq,montly.statistics=monthly),
+           file=file.path(param$wd,'results','exported-statistics.xlsx'))
+hb.freq = hb.freq[abs(hb.freq$Hb) < 1000 & !is.na(hb.freq$Hb),]
 ```
 
 This is the end of the processing and export part.
@@ -274,7 +292,7 @@ rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL) 
       } else
         sex = unique(data0$Sex)[1]
     } 
-    cutoff = if (sex=='Female') 125 else 135
+    cutoff = if (sex=='Female') param$cutoff.female else param$cutoff.male
   }
 
   if (!is.null(data0)) {
@@ -310,7 +328,8 @@ rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL) 
   sd0 = freq.stats$sd
 
   Hb.values = sort(unique(freq$Hb))
-  ndist=dnorm(Hb.values,mean=mean0,sd=sd0)
+  dx <- 1. #depends on units, but should now all be converted to g/L
+  ndist=dnorm(Hb.values,mean=mean0,sd=sd0)*dx
   
   # Plotting the unchanged distribution
   if (plot) {
@@ -369,7 +388,8 @@ rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL) 
 
   if (plot) {
     plot(prop~Hb,data=freq2,type='l',lwd=3,xlim=NULL)
-    ndist2=dnorm(Hb.values,mean=mean1,sd=sd1)
+    lines(prop~Hb,data=freq2,col='green', lwd=2)
+    ndist2=dnorm(Hb.values,mean=mean1,sd=sd1)*dx
     lines(Hb.values,ndist2,col='red',lty='dotted',lwd=2)
     abline(v=cutoff,col='blue',lty='dashed')
     rect(mean1-5,0,mean1+5,0.001,col='pink',lwd=2)
@@ -387,12 +407,8 @@ rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL) 
 
 ```{r}
 # Example of rectifying the distribution
-data0=simple
-sex='Male'
-cutoff=135
-
-rectifyDistribution(NULL,'Female',125,freq=hb.freq[hb.freq$Sex=='Female',])
-
+freq <- hb.freq[hb.freq$Sex=='Female', ]
+rectifyDistribution(NULL,'Female',param$cutoff.female,freq=freq)
 # dist.male = rectifyDistribution(simple,'Male',cutoff)
 # dist.female = rectifyDistribution(simple,'Female',cutoff)
 ```
@@ -518,7 +534,7 @@ newLMapproach = function(basics) {
   }
 
     abline(a=sm$coeff[1,1],b=sm$coeff[2,1],col='red',lty='dashed',lwd=2)
-  text(x=135,y=0.03,labels=paste0('b=',round(sm1$coeff[2,1],3),'\np=',round(sm1$coeff[2,4],3),'\nR',intToUtf8(178),'=',round(sm1$r.squared,3)),adj=c(0))
+  text(x=param$cutoff.male,y=0.03,labels=paste0('b=',round(sm1$coeff[2,1],3),'\np=',round(sm1$coeff[2,4],3),'\nR',intToUtf8(178),'=',round(sm1$r.squared,3)),adj=c(0))
   data=basics[basics$Sex=='Male',]
   m=lm(deferred.prop~mean,data=data)
   m1=lm(deferred.prop~mean+sd,data=data)
@@ -560,6 +576,8 @@ newLMapproach = function(basics) {
 rv=newLMapproach(basics)
 summary(rv$m.female)
 summary(rv$m.male)
+
+hb.freq
 
 plotColBySex(basics,'old','proportion of 40+ yrs of age')
 ```
