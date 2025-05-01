@@ -92,6 +92,29 @@ for (ds in data.sets) {
   hb.freq = if(is.null(hb.freq)) freq0 else rbind(hb.freq,freq0)
 }
 
+anonymizeDistribution = function(freq) {
+  # freq = hb.freq
+  wh.sub = which(freq$n < 5 & freq$Hb < freq$limit)
+  wh.super = which(freq$n < 5 & freq$Hb > freq$limit)
+  
+  freq$Hb[wh.sub] = -1e6
+  freq$Hb[wh.super] = 1e6
+  
+  aggregated = freq[c(wh.sub,wh.super),] %>%
+    mutate(sgn=sign(Hb)) %>%
+    group_by(data.set,year,Sex,sgn) %>%
+    summarise(Hb=min(sgn)*1e6,n2=sum(n),nas=sum(nas),deferred=sum(deferred),
+              mean.age=sum(n*mean.age)/sum(n),sd.age=NA,limit=min(limit),.groups='drop') %>%
+    dplyr::select(-sgn) %>%
+    rename(n=n2)
+
+  freq=freq[-c(wh.sub,wh.super),]
+  freq = rbind(freq,aggregated)
+  freq[with(freq,order(data.set,year,Sex,Hb)),]
+}
+
+hb.freq = anonymizeDistribution(hb.freq)
+
 # Annual age distributions by Sex
 data.sets=c('donation0','donation.r','simple')
 age.freq = NULL
@@ -121,7 +144,7 @@ Open questions:
 - Should the lower parts be somehow masked: is there a risk of leaking personal data?
 
 ```{r export-data}
-write.xlsx(list(annual.hb=hb.freq,annual.age=age.freq,montly.statistics=monthly),file=file.path(param$wd,'exported-statistics.xlsx'))
+write.xlsx(list(annual.hb=hb.freq,annual.age=age.freq,montly.statistics=monthly),file=file.path(param$wd,'results','exported-statistics.xlsx'))
 ```
 
 This is the end of the processing and export part.
