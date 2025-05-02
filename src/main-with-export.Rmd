@@ -372,6 +372,8 @@ rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL) 
   # This is the part that 
   cnt = 0
   freq2 = freq
+  # cover the case that there is no data at the cutoff value (should not occur with reasonable data volumes)
+  # k = which(freq$Hb==cutoff)
   k = max(which(freq$Hb<=cutoff))
   if (length(k) == 0 || k == -Inf) 
     k = min(which(freq$Hb>=cutoff))
@@ -513,6 +515,7 @@ getStats = function(freq,value.col='Hb',group.col='year',n.filter=100,age.freq=N
 
 ```{r county-specific-basics}
 getCountryBasics = function(hb.freq,age.freq) {
+  # hb.freq = data$hb.freq; age.freq=data$age.freq
   freq0=hb.freq[hb.freq$data.set=='donation0',]
   age0 = age.freq[age.freq$data.set=='donation0',]
   rv=by(freq0,freq0[,c('Sex','year')],function(x) unlist(rectifyDistribution(data0=NULL,freq=x,plot=FALSE)$params))

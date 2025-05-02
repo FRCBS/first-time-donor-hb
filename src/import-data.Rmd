@@ -22,6 +22,9 @@ importCountry = function(country,file) {
     data = read.xlsx(file,colNames=TRUE,rowNames=FALSE,sheet = sn)
     data$country = country
     data=data[,c(ncol(data),1:(ncol(data)-1))]
+    
+    # import data only for males and females; rectifyDistribution returns invalid data if used with empty sex
+    data=data[data$Sex %in% c('Male','Female'),]
     if (sn == 'annual.hb'){
       data = data[abs(data$Hb) < 1000 & !is.na(data$Hb),]
       hb.freq = data
@@ -80,7 +83,7 @@ plotColByCountry = function(basics,col,ylab,xvar='year',sex='Female') {
 ```{r import-and-format-data}
 data = importCountry('FI','exported-statistics.xlsx')
 basics.fi = data.frame(country='FI',getCountryBasics(data$hb.freq,data$age.freq))
-data = importCountry('NL','exported-statistics_Hb_NL.xlsx')
+data = importCountry('NL','exported-statistics_Hb_NL_v2.xlsx')
 basics.nl = data.frame(country='NL',getCountryBasics(data$hb.freq,data$age.freq))
 
 basics = rbind(basics.fi,basics.nl)
