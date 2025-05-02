@@ -40,6 +40,18 @@ param$include.na = TRUE
 param$minimum.group.size = 5
 param$donation.type.keys = NULL
 
+param$age.minimum = 16
+param$age.maximum = 75
+param$hb.minimum = 50
+param$hb.maximum = 250
+
+# The number of intended decimals in Hb values
+# Typically 0 for g/L, 1 for g/dL and mmol/L
+param$hb.decimals = 1
+
+# conversion factor from mmol/L to g/L: cf = 10 / 0.6206, see import-data.Rmd for details
+
+# Country specific settings from parameters
 if (param$country == 'NL') {
   param$donationdata = '~/data/data_timo.rdata'
   param$units = 'mmol/L' # one of: mmol/L, or g/L or g/dL
@@ -53,6 +65,7 @@ if (param$country == 'NL') {
   param$cutoff.female = 125
   param$data.sets = c('donation0','donation.r','simple')
   param$donation.type.keys = c('Whole Blood (K)','No Donation (E)','VisitNoDonation')
+  param$hb.decimals = 0
 } 
 
 # nb! Change this to point to the correct data 
@@ -74,7 +87,6 @@ if (is.null(param$donation.type.keys))
 
 simple = donationdata$donation %>%
   filter(param$include.na || !is.na(Hb)) %>%
-  # filter(!is.na(Hb)) %>% #filter NA's # TODO must decide whether to keep or leave
   filter(BloodDonationTypeKey %in% param$donation.type.keys) %>%
   # VisitNoDonation is used in Finland during the recent years instead of No Donation (E)
   left_join(donationdata$donor[,c('releaseID','DateOfBirth','Sex','BloodGroup')],by='releaseID')
@@ -82,6 +94,11 @@ simple$age= as.numeric(difftime(simple$DonationDate,simple$DateOfBirth),unit="we
 simple$month = as.factor(month(simple$DonationDate))
 simple$year = year(simple$DonationDate)
 simple$year.factor = as.factor(simple$year)
+
+simple = simple %>%
+  filter(age >= param$age.minimum, age <= param$age.maximum) %>%
+  filter(Hb >= param$hb.minimum, Hb <= param$hb.maximum) %>%
+  mutate(Hb = round(Hb,param$hb.decimals))
 
 simple$limit = param$cutoff.male
 simple$limit[simple$Sex=='Female'] = param$cutoff.female
@@ -186,8 +203,11 @@ Open questions:
 - Should the lower parts be somehow masked: is there a risk of leaking personal data?
 
 ```{r export-data}
-write.xlsx(list(annual.hb=hb.freq,annual.age=age.freq,montly.statistics=monthly),
+write.xlsx(list(parameters=data.frame(name=names(param),value=paste(param,sep=',')),
+                annual.hb=hb.freq,annual.age=age.freq,montly.statistics=monthly),
            file=file.path(param$wd,'results','exported-statistics.xlsx'))
+
+# Remove the placeholder values for very small and very large Hb values and NA's
 hb.freq = hb.freq[abs(hb.freq$Hb) < 1000 & !is.na(hb.freq$Hb),]
 ```
 
@@ -514,7 +534,7 @@ getStats = function(freq,value.col='Hb',group.col='year',n.filter=100,age.freq=N
 ```
 
 ```{r county-specific-basics}
-getCountryBasics = function(hb.freq,age.freq) {
+getCountryBasics = function(hb.freq,age.freq,cf=1) {
   # hb.freq = data$hb.freq; age.freq=data$age.freq
   freq0=hb.freq[hb.freq$data.set=='donation0',]
   age0 = age.freq[age.freq$data.set=='donation0',]
@@ -526,8 +546,20 @@ getCountryBasics = function(hb.freq,age.freq) {
   basics.all = getStats(freq0,age.freq = age0)
   
   # Basic statistics joined with results from the rectified distributions
-  inner_join(basics.all,res,
+  basics = inner_join(basics.all,res,
                       join_by(year,Sex),suffix=c('','.rectified'))
+  
+  if (cf==1) 
+    return(basics)
+  colnames(basics)
+  
+  convert.cols = grep('^mean|sd',colnames(basics))
+  basics[,convert.cols] = basics[,convert.cols]*cf
+  
+  convert.cols.sq = grep('^var',colnames(basics))
+  basics[,convert.cols.sq] = basics[,convert.cols.sq]*cf^2
+  
+  return(basics)
 }
 ```
 

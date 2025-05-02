@@ -26,7 +26,7 @@ importCountry = function(country,file) {
     # import data only for males and females; rectifyDistribution returns invalid data if used with empty sex
     data=data[data$Sex %in% c('Male','Female'),]
     if (sn == 'annual.hb'){
-      data = data[abs(data$Hb) < 1000 & !is.na(data$Hb),]
+      data = data[abs(data$Hb) <= 900 & !is.na(data$Hb),]
       hb.freq = data
     } else if (sn == 'annual.age') {
       age.freq = data
@@ -83,8 +83,13 @@ plotColByCountry = function(basics,col,ylab,xvar='year',sex='Female') {
 ```{r import-and-format-data}
 data = importCountry('FI','exported-statistics.xlsx')
 basics.fi = data.frame(country='FI',getCountryBasics(data$hb.freq,data$age.freq))
+
+# The conversion rate is now given as a parameter to the function where the statistics are computed
+# The conversion is done after the rectification for the statistics computed
 data = importCountry('NL','exported-statistics_Hb_NL_v2.xlsx')
-basics.nl = data.frame(country='NL',getCountryBasics(data$hb.freq,data$age.freq))
+basics.nl = data.frame(country='NL',getCountryBasics(data$hb.freq,data$age.freq,cf = 10 / 0.6206))
+
+# data.cols=c('n','mean','deferred.prop','sd','skewness','kurtosis','young','age','mean.rectified','sd','deferred.prop.rectified')
 
 basics = rbind(basics.fi,basics.nl)
 ```
@@ -95,7 +100,7 @@ for (i in 1:nrow(uqs)) {
   val = uqs[i,]
   freq = data$hb.freq %>% filter(year==val$year,Sex==val$Sex)
   print(val)
-  rectifyDistribution(NULL,freq=freq,plot=FAlSE)
+  rectifyDistribution(NULL,freq=freq,plot=FALSE)
 }
 ```
 
