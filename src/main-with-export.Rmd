@@ -33,9 +33,10 @@ dir.create(file.path(param$wd,"log"),showWarnings = FALSE)
 param$result.file = file.path(param$wd,"results","data.xlsx")
 
 # nb! Change this to point to the correct data 
-param$donationdata = 'C:/git_repot/DATA/donationdata.fortimo.rdata'
-param$country = 'FI' # Not used currently; country could also be assigned when reading in the various data
-param$units = 'g/L' # one of: mmol/L, or g/L or g/dL
+# param$donationdata = 'C:/git_repot/DATA/donationdata.fortimo.rdata'
+param$donationdata = '~/data/data_timo.rdata'
+param$country = 'NL' # Not used currently; country could also be assigned when reading in the various data
+param$units = 'mmol/L' # one of: mmol/L, or g/L or g/dL
 param$cutoff.male = 135 # 8.4 # will need to convert these to correct units
 param$cutoff.female = 125 # 7.8
 param$data.sets = c('donation0','donation.r','simple')
@@ -74,10 +75,17 @@ simple <- simple %>% filter(!is.na(Sex))
 
 #For NL should take only BloodDonationTypeKey == "N" for first donation
 # date of first donation
-date0 = simple %>%
-  filter(param$country != 'NL' || BloodDonationTypeKey == "New") %>%
-  group_by(releaseID) %>%
-  summarise(date0=min(DonationDate),.groups='drop')
+#The filter(param$country != NL || BloodDonationTypeKey == "New") gave an error for me so changed to this
+if (param$country == "NL") {
+  date0 = simple %>%
+    filter(BloodDonationTypeKey == "New") %>%
+    group_by(releaseID) %>%
+    summarise(date0=min(DonationDate),.groups='drop')
+  } else {
+    date0 = simple %>%
+    group_by(releaseID) %>%
+    summarise(date0=min(DonationDate),.groups='drop')
+}
 
 # first-time donations
 donation0 = simple %>%
