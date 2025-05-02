@@ -1,7 +1,7 @@
 library(openxlsx)
 
-exportCountry = function(country,file) {
-  file=file.path(param$wd,'data','exported-statistics_Hb_NL.xlsx')
+importCountry = function(country,file) {
+  file=file.path(param$wd,'data',file)
   sheet.names = getSheetNames(file)
   country='NL'
   for (sn in sheet.names) {
@@ -27,12 +27,62 @@ rbindByElement = function(x,y) {
   x
 }
 
-# data=exportCountry('NL','exported-statistics_Hb_NL.xlsx')
+plotColByCountry = function(basics,col,ylab,xvar='year',sex='Female') {
+  sex.col = data.frame(sex=c('Female','Male'),col=c('red','blue'))
+  rownames(sex.col)=sex.col$sex
+  country.col = data.frame(country=c('NL','FI'),name=c('Netherlands','Finland'),col=c('orange','blue'))
+  rownames(country.col)=country.col$country
+  
+  basics = basics %>%
+    filter(Sex==sex)
+  
+  par(mar=c(2,4,0,4))
+  plot.cols=c(col)
+  plot(basics[[xvar]],basics[[plot.cols[1]]],type='n',ylab=paste(ylab,sex))
+  for (i in 1:nrow(country.col)) {
+    data1 = basics[basics$country==country.col$country[i],]
+    for (col in plot.cols) {
+      lines(data1[[xvar]],data1[[col]],col=country.col$col[i],lwd=2)
+      
+      for (suf in c('low','hi')) {
+        ci.var = paste0(col,'.',suf)
+        if (ci.var %in% names(basics)) {
+          lines(data1[[xvar]],data1[[ci.var]],lty='dotted',lwd=1,col=country.col$col[i])
+        }
+      }
+      
+      frml=paste0(col,'~',xvar)
+      m=lm(formula(frml),data=data1)
+      sm=summary(m)
+      abline(a=sm$coeff[1,1],b=sm$coeff[2,1],col=country.col$col[i],lty='dashed',lwd=2)
+      text(x=min(data1[[xvar]]),y=min(data1[[col]])+0.01,
+           labels=paste0('b=',round(100*sm$coeff[2,1],5),'%,p=',round(sm$coeff[2,4],3)),adj=c(0))
+    }
+  }
+}
 
-data = exportCountry('FI',exported-statistics.xlsx)
-data = rbindByElement(data,exportCountry('NL','exported-statistics_Hb_NL.xlsx'))
-hb.freq=data$hb.freq
-age.freq=data$age.freq
-monthly=data$monthly
+data = importCountry('FI','exported-statistics.xlsx')
+basics.fi = data.frame(country='FI',getCountryBasics(data$hb.freq,data$age.freq))
+data = importCountry('NL','exported-statistics_Hb_NL.xlsx')
+basics.nl = data.frame(country='NL',getCountryBasics(data$hb.freq,data$age.freq))
 
+basics = rbind(basics.fi,basics.nl)
 
+uqs=unique(data$hb.freq[,c('Sex','year')])
+for (i in 1:nrow(uqs)) {
+  # str(val)
+  val = uqs[i,]
+  freq = data$hb.freq %>% filter(year==val$year,Sex==val$Sex)
+  print(val)
+  rectifyDistribution(NULL,freq=freq)
+}
+
+```{r new-plots}
+# These require both the FI and NL data
+data.cols=c('mean','deferred.prop','sd','skewness','kurtosis','young','age','mean.rectified','deferred.prop.rectified')
+for (col in data.cols) {
+  plotColByCountry(basics,col=col,ylab=col,xvar='year',sex='Female')
+  plotColByCountry(basics,col=col,ylab=col,xvar='year',sex='Male')
+}
+
+```

@@ -18,6 +18,7 @@ library(tidyr)
 library(moments)
 library(openxlsx)
 ```
+
 ```{r working-directory-and-file-paths}
 param=list()
 param$wd = getwd()
@@ -32,16 +33,31 @@ dir.create(file.path(param$wd,"results"),showWarnings = FALSE)
 dir.create(file.path(param$wd,"log"),showWarnings = FALSE)
 param$result.file = file.path(param$wd,"results","data.xlsx")
 
-# nb! Change this to point to the correct data 
-# param$donationdata = 'C:/git_repot/DATA/donationdata.fortimo.rdata'
-param$donationdata = '~/data/data_timo.rdata'
-param$country = 'NL' # Not used currently; country could also be assigned when reading in the various data
-param$units = 'mmol/L' # one of: mmol/L, or g/L or g/dL
-param$cutoff.male = 135 # 8.4 # will need to convert these to correct units
-param$cutoff.female = 125 # 7.8
-param$data.sets = c('donation0','donation.r','simple')
+# param$country = 'NL' 
+param$country = 'FI'
+
 param$include.na = TRUE
 param$minimum.group.size = 5
+param$donation.type.keys = c()
+
+if (param$country == 'NL') {
+  param$donationdata = '~/data/data_timo.rdata'
+  param$units = 'mmol/L' # one of: mmol/L, or g/L or g/dL
+  param$cutoff.male = 8.4 # will need to convert these to correct units
+  param$cutoff.female = 7.8
+  param$data.sets = c('donation0') # ,'donation.r','simple')
+} else if (param$country == 'FI') {
+  param$donationdata = 'C:/git_repot/DATA/donationdata.fortimo.rdata'
+  param$units = 'g/L' # one of: mmol/L or g/L or g/dL
+  param$cutoff.male = 135
+  param$cutoff.female = 125
+  param$data.sets = c('donation0','donation.r','simple')
+  param$donation.type.keys = c('Whole Blood (K)','No Donation (E)','VisitNoDonation')
+} 
+
+# nb! Change this to point to the correct data 
+# param$donationdata = '~/data/data_timo.rdata'
+
 # CONVERTED = F
 ```
 
@@ -63,7 +79,6 @@ simple$age= as.numeric(difftime(simple$DonationDate,simple$DateOfBirth),unit="we
 simple$month = as.factor(month(simple$DonationDate))
 simple$year = year(simple$DonationDate)
 simple$year.factor = as.factor(simple$year)
-
 
 simple$limit = param$cutoff.male
 simple$limit[simple$Sex=='Female'] = param$cutoff.female
@@ -354,7 +369,9 @@ rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL) 
   # This is the part that 
   cnt = 0
   freq2 = freq
-  k = which(freq$Hb==cutoff) 
+  k = max(which(freq$Hb<=cutoff))
+  if (length(k) == 0 || k == -Inf) 
+    k = min(which(freq$Hb>=cutoff))
   while (TRUE) {
     diff = (freq2$prop-ndist)[1:(k-1)]
     wh = which(diff < -0.0005)
@@ -491,9 +508,30 @@ getStats = function(freq,value.col='Hb',group.col='year',n.filter=100,age.freq=N
 }
 ```
 
+```{r county-specific-basics}
+getCountryBasics = function(hb.freq,age.freq) {
+  freq0=hb.freq[hb.freq$data.set=='donation0',]
+  age0 = age.freq[age.freq$data.set=='donation0',]
+  rv=by(freq0,freq0[,c('Sex','year')],function(x) unlist(rectifyDistribution(data0=NULL,freq=x,plot=FALSE)$params))
+  res=array2DF(rv)
+  res$year=as.integer(res$year)
+  
+  # Basic statistics for the unrectified hb distributions
+  basics.all = getStats(freq0,age.freq = age0)
+  
+  # Basic statistics joined with results from the rectified distributions
+  inner_join(basics.all,res,
+                      join_by(year,Sex),suffix=c('','.rectified'))
+}
+```
+
+
 ```{r basic-data-processing}
 freq0=hb.freq[hb.freq$data.set=='donation0',]
+
+# Rectify the male distribution from all years as an example
 rectifyDistribution(data0=NULL,freq=freq0[freq0$Sex=='Male',])
+
 rv=by(freq0,freq0[,c('Sex','year')],function(x) unlist(rectifyDistribution(data0=NULL,freq=x,plot=FALSE)$params))
 res=array2DF(rv)
 res$year=as.integer(res$year)
@@ -582,10 +620,8 @@ newLMapproach = function(basics) {
 # Do the young and old age proportions explain deferral rates:
 # They do, but only for men 
 rv=newLMapproach(basics)
-summary(rv$m.female)
-summary(rv$m.male)
-
-hb.freq
+# summary(rv$m.female)
+# summary(rv$m.male)
 
 plotColBySex(basics,'old','proportion of 40+ yrs of age')
 ```
@@ -601,3 +637,14 @@ plotColBySex(agedist,'sd',xvar = 'age',ylab='')
 
 plotColBySex(basics,'age',xvar='year',ylab='age by year')
 ```
+
+```{r new-plots}
+# These require both the FI and NL data
+data.cols=c('mean','deferred.prop','sd','skewness','kurtosis','young','age','mean.rectified','deferred.prop.rectified')
+for (col in data.cols) {
+  plotColByCountry(basics,col=col,ylab=col,xvar='year',sex='Female')
+  plotColByCountry(basics,col=col,ylab=col,xvar='year',sex='Male')
+}
+
+```
+
