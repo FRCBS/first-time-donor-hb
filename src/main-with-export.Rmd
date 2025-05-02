@@ -57,7 +57,7 @@ if (param$country == 'NL') {
   param$units = 'mmol/L' # one of: mmol/L, or g/L or g/dL
   param$cutoff.male = 8.4 # will need to convert these to correct units
   param$cutoff.female = 7.8
-  param$data.sets = c('donation0') # ,'donation.r','simple')
+  param$data.sets = c('donation0','donation.r','simple')
 } else if (param$country == 'FI') {
   param$donationdata = 'C:/git_repot/DATA/donationdata.fortimo.rdata'
   param$units = 'g/L' # one of: mmol/L or g/L or g/dL
@@ -98,7 +98,8 @@ simple$year.factor = as.factor(simple$year)
 simple = simple %>%
   filter(age >= param$age.minimum, age <= param$age.maximum) %>%
   filter(Hb >= param$hb.minimum, Hb <= param$hb.maximum) %>%
-  mutate(Hb = round(Hb,param$hb.decimals))
+  mutate(Hb = round(Hb,param$hb.decimals)) %>%
+  filter(Sex %in% c('Female','Male')) 
 
 simple$limit = param$cutoff.male
 simple$limit[simple$Sex=='Female'] = param$cutoff.female
@@ -181,7 +182,8 @@ for (ds in data.sets) {
   freq0 = get(ds) %>%
     mutate(data.set=if(ds == 'simple') 'all' else ds,age=as.integer(age)) %>%
     group_by(data.set,year,Sex,age) %>%
-    summarise(n=n(),nas=sum(1*is.na(Hb)),deferred=sum(deferred,na.rm=TRUE),mean.hb=mean(Hb,na.rm=TRUE),sd.hb=sd(Hb,na.rm=TRUE),.groups='drop')
+    summarise(n=n(),nas=sum(1*is.na(Hb)),deferred=sum(deferred,na.rm=TRUE),mean.hb=mean(Hb,na.rm=TRUE),sd.hb=sd(Hb,na.rm=TRUE),.groups='drop') %>%
+    filter(n>=5)
   age.freq = if(is.null(age.freq)) freq0 else rbind(age.freq,freq0)
 }
 
