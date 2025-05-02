@@ -1,5 +1,19 @@
-library(openxlsx)
+---
+title: "Hemoglobin distributions and trends"
+author: "Timo Asikainen"
+date: "2025-02-20" 
+output: html_document
+---
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(openxlsx)
+```
+
+```{r}
 importCountry = function(country,file) {
   file=file.path(param$wd,'data',file)
   sheet.names = getSheetNames(file)
@@ -60,26 +74,31 @@ plotColByCountry = function(basics,col,ylab,xvar='year',sex='Female') {
     }
   }
 }
+```
 
+
+```{r import-and-format-data}
 data = importCountry('FI','exported-statistics.xlsx')
 basics.fi = data.frame(country='FI',getCountryBasics(data$hb.freq,data$age.freq))
 data = importCountry('NL','exported-statistics_Hb_NL.xlsx')
 basics.nl = data.frame(country='NL',getCountryBasics(data$hb.freq,data$age.freq))
 
 basics = rbind(basics.fi,basics.nl)
+```
 
+```{r test-code-for-rectiry-distribution}
 uqs=unique(data$hb.freq[,c('Sex','year')])
 for (i in 1:nrow(uqs)) {
-  # str(val)
   val = uqs[i,]
   freq = data$hb.freq %>% filter(year==val$year,Sex==val$Sex)
   print(val)
-  rectifyDistribution(NULL,freq=freq)
+  rectifyDistribution(NULL,freq=freq,plot=FAlSE)
 }
+```
 
 ```{r new-plots}
 # These require both the FI and NL data
-data.cols=c('mean','deferred.prop','sd','skewness','kurtosis','young','age','mean.rectified','deferred.prop.rectified')
+data.cols=c('n','mean','deferred.prop','sd','skewness','kurtosis','young','age','mean.rectified','deferred.prop.rectified')
 for (col in data.cols) {
   plotColByCountry(basics,col=col,ylab=col,xvar='year',sex='Female')
   plotColByCountry(basics,col=col,ylab=col,xvar='year',sex='Male')

@@ -38,7 +38,7 @@ param$country = 'FI'
 
 param$include.na = TRUE
 param$minimum.group.size = 5
-param$donation.type.keys = c()
+param$donation.type.keys = NULL
 
 if (param$country == 'NL') {
   param$donationdata = '~/data/data_timo.rdata'
@@ -69,10 +69,13 @@ load(param$donationdata)
 
 
 ```{r load-and-process-data}
+if (is.null(param$donation.type.keys)) 
+  param$donation.type.keys = unique(donationdata$donation$BloodDonationTypeKey)
+
 simple = donationdata$donation %>%
   filter(param$include.na || !is.na(Hb)) %>%
   # filter(!is.na(Hb)) %>% #filter NA's # TODO must decide whether to keep or leave
-  # filter(BloodDonationTypeKey %in% c('Whole Blood (K)','No Donation (E)')) %>%
+  filter(BloodDonationTypeKey %in% param$donation.type.keys) %>%
   # VisitNoDonation is used in Finland during the recent years instead of No Donation (E)
   left_join(donationdata$donor[,c('releaseID','DateOfBirth','Sex','BloodGroup')],by='releaseID')
 simple$age= as.numeric(difftime(simple$DonationDate,simple$DateOfBirth),unit="weeks")/52.25
@@ -638,13 +641,4 @@ plotColBySex(agedist,'sd',xvar = 'age',ylab='')
 plotColBySex(basics,'age',xvar='year',ylab='age by year')
 ```
 
-```{r new-plots}
-# These require both the FI and NL data
-data.cols=c('mean','deferred.prop','sd','skewness','kurtosis','young','age','mean.rectified','deferred.prop.rectified')
-for (col in data.cols) {
-  plotColByCountry(basics,col=col,ylab=col,xvar='year',sex='Female')
-  plotColByCountry(basics,col=col,ylab=col,xvar='year',sex='Male')
-}
-
-```
 
