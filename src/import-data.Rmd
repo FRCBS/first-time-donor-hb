@@ -15,7 +15,7 @@ library(openxlsx)
 
 ```{r}
 importCountry = function(country,file) {
-  file=file.path(param$wd,'data',file)
+  file=file.path(param$wd,'results',file)
   sheet.names = getSheetNames(file)
   country='NL'
   for (sn in sheet.names) {
@@ -81,18 +81,40 @@ plotColByCountry = function(basics,col,ylab,xvar='year',sex='Female') {
 
 
 ```{r import-and-format-data}
-data = importCountry('FI','exported-statistics.xlsx')
-basics.fi = data.frame(country='FI',getCountryBasics(data$hb.freq,data$age.freq))
+# data = importCountry('FI','exported-statistics.xlsx')
+# basics.fi = data.frame(country='FI',getCountryBasics(data$hb.freq,data$age.freq))
 
 # The conversion rate is now given as a parameter to the function where the statistics are computed
 # The conversion is done after the rectification for the statistics computed
-data = importCountry('NL','exported-statistics_Hb_NL_v2.xlsx')
+data = importCountry('NL','exported-statistics_Hb_NL.xlsx')
 basics.nl = data.frame(country='NL',getCountryBasics(data$hb.freq,data$age.freq,cf = 10 / 0.6206))
 
 # data.cols=c('n','mean','deferred.prop','sd','skewness','kurtosis','young','age','mean.rectified','sd','deferred.prop.rectified')
 
-basics = rbind(basics.fi,basics.nl)
+# basics = rbind(basics.fi,basics.nl)
 ```
+
+```{r test-ggplot}
+library(ggplot2)
+ggplot(basics.nl, aes(x=year, y=mean, color=Sex)) +
+  geom_line() +
+  geom_smooth(method='lm', formula=y~x) 
+
+ggplot(basics.nl, aes(x=year, y=n, color=Sex)) + 
+    geom_line() +
+  geom_smooth(method='lm', formula=y~x)
+
+ggplot(basics.nl, aes(x=year, y=deferred.prop, color=Sex)) + 
+    geom_line() +
+  geom_smooth(method='lm', formula=y~x)
+
+ggplot(basics.nl, aes(x=year, y=age, color=Sex)) + 
+    geom_line() 
+  # geom_smooth(method='lm', formula=y~x)
+
+
+```
+
 
 ```{r test-code-for-rectiry-distribution}
 uqs=unique(data$hb.freq[,c('Sex','year')])

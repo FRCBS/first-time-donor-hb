@@ -33,8 +33,8 @@ dir.create(file.path(param$wd,"results"),showWarnings = FALSE)
 dir.create(file.path(param$wd,"log"),showWarnings = FALSE)
 param$result.file = file.path(param$wd,"results","data.xlsx")
 
-# param$country = 'NL' 
-param$country = 'FI'
+param$country = 'NL'
+# param$country = 'FI'
 
 param$include.na = TRUE
 param$minimum.group.size = 5
@@ -42,11 +42,14 @@ param$donation.type.keys = NULL
 
 param$age.minimum = 16
 param$age.maximum = 75
-param$hb.minimum = 50
-param$hb.maximum = 250
 
+#in g/L, changed for NL
+param$hb.minimum = 50 
+param$hb.maximum = 250
 # The number of intended decimals in Hb values
 # Typically 0 for g/L, 1 for g/dL and mmol/L
+
+#Maybe set this based on given units?
 param$hb.decimals = 1
 
 # conversion factor from mmol/L to g/L: cf = 10 / 0.6206, see import-data.Rmd for details
@@ -62,6 +65,11 @@ if (param$country == 'NL') {
   param$cutoff.male = 8.4 # will need to convert these to correct units
   param$cutoff.female = 7.8
   param$data.sets = c('donation0','donation.r','simple')
+  #for NL the correct Sex and DateofBirth is in donations... sorry this is a bit cumbersome
+  param$donorkeys = c('releaseID', 'BloodGroup')
+  param$hb.minimum = 1
+  param$hb.maximum = 20
+  
 } else if (param$country == 'FI') {
   param$donationdata = 'C:/git_repot/DATA/donationdata.fortimo.rdata'
   param$units = 'g/L' # one of: mmol/L or g/L or g/dL
@@ -70,6 +78,8 @@ if (param$country == 'NL') {
   param$data.sets = c('donation0','donation.r','simple')
   param$donation.type.keys = c('Whole Blood (K)','No Donation (E)','VisitNoDonation')
   param$hb.decimals = 0
+  param$donorkeys = c('releaseID', 'DateOfBirth', 'Sex', 'BloodGroup')
+
 } 
 
 # nb! Change this to point to the correct data 
@@ -93,7 +103,7 @@ simple = donationdata$donation %>%
   filter(param$include.na || !is.na(Hb)) %>%
   filter(BloodDonationTypeKey %in% param$donation.type.keys) %>%
   # VisitNoDonation is used in Finland during the recent years instead of No Donation (E)
-  left_join(donationdata$donor[,c('releaseID','DateOfBirth','Sex','BloodGroup')],by='releaseID')
+  left_join(donationdata$donor[, param$donorkeys],by='releaseID')
 simple$age= as.numeric(difftime(simple$DonationDate,simple$DateOfBirth),unit="weeks")/52.25
 simple$month = as.factor(month(simple$DonationDate))
 simple$year = year(simple$DonationDate)
