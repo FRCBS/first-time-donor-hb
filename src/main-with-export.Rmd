@@ -95,6 +95,9 @@ simple$month = as.factor(month(simple$DonationDate))
 simple$year = year(simple$DonationDate)
 simple$year.factor = as.factor(simple$year)
 
+# 2025-05-15 New line to convert the new datetime column to integer for hour)
+simple$hour = as.integer(format(simple$DonationDateDTTM,'%H'))
+
 simple = simple %>%
   filter(age >= param$age.minimum, age <= param$age.maximum) %>%
   filter(Hb >= param$hb.minimum, Hb <= param$hb.maximum) %>%
@@ -170,6 +173,7 @@ anonymizeDistribution = function(freq) {
 
   freq=freq[-c(wh.sub,wh.super),]
   freq = rbind(freq,aggregated)
+  freq = freq[freq$n >= param$minimum.group.size,]
   freq[with(freq,order(data.set,year,Sex,Hb)),]
 }
 
@@ -183,7 +187,7 @@ for (ds in data.sets) {
     mutate(data.set=if(ds == 'simple') 'all' else ds,age=as.integer(age)) %>%
     group_by(data.set,year,Sex,age) %>%
     summarise(n=n(),nas=sum(1*is.na(Hb)),deferred=sum(deferred,na.rm=TRUE),mean.hb=mean(Hb,na.rm=TRUE),sd.hb=sd(Hb,na.rm=TRUE),.groups='drop') %>%
-    filter(n>=5)
+    filter(n >= param$minimum.group.size)
   age.freq = if(is.null(age.freq)) freq0 else rbind(age.freq,freq0)
 }
 
@@ -194,9 +198,26 @@ for (ds in data.sets) {
     mutate(data.set=ds) %>%
     group_by(data.set,year,Sex,month) %>%
     summarise(n=n(),nas=sum(1*is.na(Hb)),deferred=sum(deferred,na.rm=TRUE),mean=mean(Hb,na.rm=TRUE),sd=sd(Hb,na.rm=TRUE),
-              mean.age=mean(age,na.rm=TRUE),sd.age=sd(age,na.rm=TRUE),nas=sum(1*is.na(Hb)),.groups='drop') 
+              mean.age=mean(age,na.rm=TRUE),sd.age=sd(age,na.rm=TRUE),nas=sum(1*is.na(Hb)),.groups='drop') %>%
+    filter(n >= param$minimum.group.size) %>%
+    arrange(year,Sex,month)
   monthly = if(is.null(monthly)) monthly0 else rbind(monthly,monthly0)
 }
+
+# Hourly statistics
+hourly = NULL
+for (ds in data.sets) {
+  hourly0 = get(ds) %>%
+    mutate(data.set=ds) %>%
+    group_by(data.set,year,Sex,hour) %>%
+    summarise(n=n(),nas=sum(1*is.na(Hb)),deferred=sum(deferred,na.rm=TRUE),mean=mean(Hb,na.rm=TRUE),sd=sd(Hb,na.rm=TRUE),
+              mean.age=mean(age,na.rm=TRUE),sd.age=sd(age,na.rm=TRUE),nas=sum(1*is.na(Hb)),.groups='drop') %>%
+    filter(n >= param$minimum.group.size) %>%
+    arrange(year,Sex,hour)
+  hourly = if(is.null(hourly)) hourly0 else rbind(hourly,hourly0)
+}
+
+hourly
 ```
 
 Open questions:
@@ -206,7 +227,7 @@ Open questions:
 
 ```{r export-data}
 write.xlsx(list(parameters=data.frame(name=names(param),value=paste(param,sep=',')),
-                annual.hb=hb.freq,annual.age=age.freq,montly.statistics=monthly),
+                annual.hb=hb.freq,annual.age=age.freq,montly.statistics=monthly,hourly.statistics=hourly),
            file=file.path(param$wd,'results','exported-statistics.xlsx'))
 
 # Remove the placeholder values for very small and very large Hb values and NA's
