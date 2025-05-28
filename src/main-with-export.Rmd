@@ -51,6 +51,10 @@ param$hb.decimals = 1
 
 # conversion factor from mmol/L to g/L: cf = 10 / 0.6206, see import-data.Rmd for details
 
+param$extractHour = function(simple) {
+  return(as.integer(format(simple$DonationDateDTTM,'%H')))
+}
+
 # Country specific settings from parameters
 if (param$country == 'NL') {
   param$donationdata = '~/data/data_timo.rdata'
@@ -96,7 +100,7 @@ simple$year = year(simple$DonationDate)
 simple$year.factor = as.factor(simple$year)
 
 # 2025-05-15 New line to convert the new datetime column to integer for hour)
-simple$hour = as.integer(format(simple$DonationDateDTTM,'%H'))
+simple$hour = param$extractHour(simple)
 
 simple = simple %>%
   filter(age >= param$age.minimum, age <= param$age.maximum) %>%
@@ -216,8 +220,6 @@ for (ds in data.sets) {
     arrange(year,Sex,hour)
   hourly = if(is.null(hourly)) hourly0 else rbind(hourly,hourly0)
 }
-
-hourly
 ```
 
 Open questions:
