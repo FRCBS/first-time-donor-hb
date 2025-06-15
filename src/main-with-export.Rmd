@@ -5,6 +5,63 @@ date: "2025-02-20"
 output: html_document
 ---
 
+## How to run the code
+
+### Setting the parameters
+
+Some parameters must be set for the code to run correctly. The parameters 
+are saved in the **param** list. The parameters are set in the **parameters** block
+below. The parameters are:
+
+- wd: The working directory to be used. This is set by Rstudio to either the **src**
+or the root folder of the project, e.g., "C:/git_repot/first-time-donor-hb".
+The correct setting is the project root. The code in the block checks if the 
+**src** folder has been selected, and changes the folder to project root if yes.
+- result.file: where the anonymised results will be exported. By default this
+is in the **results** subfolder in file named **exported-data.xlsx**. This is computed
+by the code and needs not be changed.
+- country: two-letter identifier for the country, e.g., FI. **Should be changed.**
+- age.minimum, age.maximum: The minimum and maximum ages, respectively, at the
+time of donation that are included in the exported data.
+- hb.minimum, hb.maximum: Similarly as above, but for Hb values. The default
+values are -Inf and Inf, respectively, meaning that all Hb non-NA/NULL Hb values 
+are included. 
+- include.na: Should donations with Hb value unavailable (NA) included or not.
+Default is yes (**TRUE**).
+- minimum.group.size: The smallest group size (*n*) that is exported.
+- donation.type.keys: Which values in **donationdata$donation$BloodDonationTypeKey**
+are included in the analysis. The idea is to consider full blood donations, 
+either successful or deferred cases.
+- hb.decimals: The number of decimals in Hb values that should be used.
+- donationdata: Path to the .Rdata file containing the data to be used. This is
+hard-coded by default to **donationdata.Rdata** in the working directory.
+- units: HB units to be used: Shold be one of: mmol/L, or g/L or g/dL.
+- cutoff.male, cutoff.female: The required mimimum values to donate for males 
+and females, respectively. These **must be set** and expressed in **units**.
+- data.set: Which data sets should be summarised and exported. The default is
+c('donation0','donation.r','simple'), which correspond to (1) first time donations 
+(first mention of relasedID in the **donation** data set); (2) repeat donations, 
+i.e., other than the first mention; and (3) all donations. The primary interest 
+lies in the first donations, but other data sets are included by default for 
+completeness and to enable additional analyses.
+- extractHour: A function to extract the hour from **donationdata**. The default 
+provided works when the time information is included in **DonationTimeDTTM** 
+column in **donationdata$donation** in POSIXct format. The function
+can be adjusted accordingnly.
+
+## Exporting the data
+
+To export the data, code should be run from the start of this file 
+(** main-with-export.Rmd**) up to and including the chunk **export-data**. 
+This includes setting the parameters (described) above, loading and processing 
+the data, extracting anonymous statistics and writing these to the 
+**exported-data.xlsx** file as described above.
+
+The statistics are anonymised by removing any groups with size smaller then 
+the parameter **minimum.group.size** (default 5). For Hb, small and large Hb
+values with fewer observations than the limit are pooled together and inxluded
+in the exported data using specific placeholders (-1000000 and 1000000). 
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -19,7 +76,7 @@ library(moments)
 library(openxlsx)
 ```
 
-```{r working-directory-and-file-paths}
+```{r parameters}
 param=list()
 param$wd = getwd()
 
@@ -31,7 +88,7 @@ if (grepl('[/\\]src[/\\]?',param$wd)) {
 
 dir.create(file.path(param$wd,"results"),showWarnings = FALSE)
 dir.create(file.path(param$wd,"log"),showWarnings = FALSE)
-param$result.file = file.path(param$wd,"results","data.xlsx")
+param$result.file = file.path(param$wd,"results","exported-data.xlsx")
 
 # param$country = 'NL' 
 param$country = 'FI'
@@ -42,8 +99,10 @@ param$donation.type.keys = NULL
 
 param$age.minimum = 16
 param$age.maximum = 75
-param$hb.minimum = 50
-param$hb.maximum = 250
+param$hb.minimum = -Inf
+param$hb.maximum = Inf
+
+param$donationdata = file.path(param$wd,'donationdata.Rdata')
 
 # The number of intended decimals in Hb values
 # Typically 0 for g/L, 1 for g/dL and mmol/L
@@ -52,14 +111,17 @@ param$hb.decimals = 1
 # conversion factor from mmol/L to g/L: cf = 10 / 0.6206, see import-data.Rmd for details
 
 param$extractHour = function(simple) {
-  return(as.integer(format(simple$DonationDateDTTM,'%H')))
+  return(as.integer(format(simple$DonationTimeDTTM,'%H')))
 }
+
+# always return 0 (if no hour is available)
+# param$extractHour = function(simple) {return(0)} 
 
 # Country specific settings from parameters
 if (param$country == 'NL') {
   param$donationdata = '~/data/data_timo.rdata'
   param$units = 'mmol/L' # one of: mmol/L, or g/L or g/dL
-  param$cutoff.male = 8.4 # will need to convert these to correct units
+  param$cutoff.male = 8.4 
   param$cutoff.female = 7.8
   param$data.sets = c('donation0','donation.r','simple')
 } else if (param$country == 'FI') {
@@ -67,15 +129,12 @@ if (param$country == 'NL') {
   param$units = 'g/L' # one of: mmol/L or g/L or g/dL
   param$cutoff.male = 135
   param$cutoff.female = 125
+  param$hb.minimum = 50
+  param$hb.maximum = 250
   param$data.sets = c('donation0','donation.r','simple')
   param$donation.type.keys = c('Whole Blood (K)','No Donation (E)','VisitNoDonation')
   param$hb.decimals = 0
 } 
-
-# nb! Change this to point to the correct data 
-# param$donationdata = '~/data/data_timo.rdata'
-
-# CONVERTED = F
 ```
 
 ```{r load-data}
@@ -230,7 +289,7 @@ Open questions:
 ```{r export-data}
 write.xlsx(list(parameters=data.frame(name=names(param),value=paste(param,sep=',')),
                 annual.hb=hb.freq,annual.age=age.freq,montly.statistics=monthly,hourly.statistics=hourly),
-           file=file.path(param$wd,'results','exported-statistics.xlsx'))
+           file=param$result.file)
 
 # Remove the placeholder values for very small and very large Hb values and NA's
 hb.freq = hb.freq[abs(hb.freq$Hb) < 1000 & !is.na(hb.freq$Hb),]
