@@ -111,6 +111,9 @@ simple$year.factor = as.factor(simple$year)
 
 # 2025-05-15 New line to convert the new datetime column to integer for hour)
 simple$hour = param$extractHour(simple)
+# simple$hour = as.integer(format(simple$DonationDateDTTM,'%H'))
+#NL take the first substr from "%H-M%"
+#simple$hour <- ifelse(is.na(simple$DonationTimeStart), NA_integer_, as.integer(substr(simple$DonationTimeStart, 1, 2)))
 
 simple = simple %>%
   filter(age >= param$age.minimum, age <= param$age.maximum) %>%
