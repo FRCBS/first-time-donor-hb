@@ -106,24 +106,35 @@ param$donationdata = file.path(param$wd,'donationdata.Rdata')
 
 # The number of intended decimals in Hb values
 # Typically 0 for g/L, 1 for g/dL and mmol/L
-param$hb.decimals = 1
+param$hb.decimals = NA
+
+param$donor.cols = c('DateOfBirth','Sex','BloodGroup')
+param$donation.cols = c()
 
 # conversion factor from mmol/L to g/L: cf = 10 / 0.6206, see import-data.Rmd for details
 
-param$extractHour = function(simple) {
-  return(as.integer(format(simple$DonationTimeDTTM,'%H')))
-}
-
 # always return 0 (if no hour is available)
-# param$extractHour = function(simple) {return(0)} 
+# nb! In order to extract hourly data, this function should be redefined as a
+# country-specific parameter
+param$extractHour = function(simple) {return(0)} 
 
 # Country specific settings from parameters
 if (param$country == 'NL') {
   param$donationdata = '~/data/data_timo.rdata'
   param$units = 'mmol/L' # one of: mmol/L, or g/L or g/dL
-  param$cutoff.male = 8.4 
+  param$cutoff.male = 8.4 # will need to convert these to correct units
   param$cutoff.female = 7.8
   param$data.sets = c('donation0','donation.r','simple')
+  # for NL the correct Sex and DateofBirth is in donations... sorry this is a bit cumbersome
+  param$donorkeys = c('releaseID', 'BloodGroup')
+  param$hb.minimum = 1
+  param$hb.maximum = 20
+  # MP: Funky hour extraction for NL...
+  param$extractHour = function(simple){ 
+    return(ifelse(is.na(simple$DonationTimeStart), NA_integer_, as.integer(substr(simple$DonationTimeStart, 1, 2))))
+  }
+  param$donor.cols = c('DateOfBirth')
+  param$donation.cols = c('Sex','BloodGroup','DonationTimeStart')
 } else if (param$country == 'FI') {
   param$donationdata = 'C:/git_repot/DATA/donationdata.fortimo.rdata'
   param$units = 'g/L' # one of: mmol/L or g/L or g/dL
@@ -134,7 +145,20 @@ if (param$country == 'NL') {
   param$data.sets = c('donation0','donation.r','simple')
   param$donation.type.keys = c('Whole Blood (K)','No Donation (E)','VisitNoDonation')
   param$hb.decimals = 0
+  param$extractHour = function(simple) {
+    return(as.integer(format(simple$DonationTimeDTTM,'%H')))
+  }
+  param$donor.cols = c('DateOfBirth','Sex','BloodGroup')
+  param$donation.cols = c('DonationTimeDTTM')
 } 
+
+# automated reasoning in case param$hb.decimals is not set
+if (is.na(param$hb.decimals)) {
+  if (param$param$units %in% c('mmol/L','g/dL'))
+    hb.decimals = 1
+  else
+    hb.decimals = 0
+}
 ```
 
 ```{r load-data}
@@ -148,11 +172,12 @@ load(param$donationdata)
 if (is.null(param$donation.type.keys)) 
   param$donation.type.keys = unique(donationdata$donation$BloodDonationTypeKey)
 
-simple = donationdata$donation %>%
+simple = donationdata$donation[, c("releaseID", "BloodDonationTypeKey", "DonationDate", 
+                  "DonationPlaceType", "DonationPlaceCode", "Hb", param$donation.cols)] %>%
   filter(param$include.na || !is.na(Hb)) %>%
   filter(BloodDonationTypeKey %in% param$donation.type.keys) %>%
   # VisitNoDonation is used in Finland during the recent years instead of No Donation (E)
-  left_join(donationdata$donor[,c('releaseID','DateOfBirth','Sex','BloodGroup')],by='releaseID')
+  left_join(donationdata$donor[,c('releaseID',param$donor.cols)],by='releaseID')
 simple$age= as.numeric(difftime(simple$DonationDate,simple$DateOfBirth),unit="weeks")/52.25
 simple$month = as.factor(month(simple$DonationDate))
 simple$year = year(simple$DonationDate)
@@ -458,7 +483,15 @@ rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL) 
   sd0 = freq.stats$sd
 
   Hb.values = sort(unique(freq$Hb))
-  dx <- 1. #depends on units, but should now all be converted to g/L
+  if (FALSE) {
+    dx <- 1. #depends on units, but should now all be converted to g/L
+  } else  {
+    if (param$hb.decimals == 1){
+      dx <- 0.1 #depends on units, but should now all be converted to g/L
+    } else{
+      dx = 1.
+    }
+  }
   ndist=dnorm(Hb.values,mean=mean0,sd=sd0)*dx
   
   # Plotting the unchanged distribution
