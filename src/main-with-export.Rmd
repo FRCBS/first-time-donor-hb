@@ -7,7 +7,7 @@ output: html_document
 
 ## How to run the code
 
-### Setting the parameters
+### Parameter settings
 
 Some parameters must be set for the code to run correctly. The parameters 
 are saved in the **param** list. The parameters are set in the **parameters** block
