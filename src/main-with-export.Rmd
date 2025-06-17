@@ -132,8 +132,8 @@ if (param$country == 'NL') {
   param$extractHour = function(simple){ 
     return(ifelse(is.na(simple$DonationTimeStart), NA_integer_, as.integer(substr(simple$DonationTimeStart, 1, 2))))
   }
-  param$donor.cols = c('DateOfBirth')
-  param$donation.cols = c('Sex','BloodGroup','DonationTimeStart')
+  param$donor.cols = c('BloodGroup')
+  param$donation.cols = c('Sex','DateOfBirth','DonationTimeStart')
 } else if (param$country == 'FI') {
   param$donationdata = 'C:/git_repot/DATA/donationdata.fortimo.rdata'
   param$units = 'g/L' # one of: mmol/L or g/L or g/dL
