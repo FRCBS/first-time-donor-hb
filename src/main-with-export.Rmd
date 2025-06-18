@@ -90,8 +90,8 @@ dir.create(file.path(param$wd,"results"),showWarnings = FALSE)
 dir.create(file.path(param$wd,"log"),showWarnings = FALSE)
 param$result.file = file.path(param$wd,"results","exported-data.xlsx")
 
-# param$country = 'NL' 
-param$country = 'FI'
+param$country = 'NL'
+# param$country = 'FI'
 
 param$include.na = TRUE
 param$minimum.group.size = 5
@@ -102,7 +102,8 @@ param$age.maximum = 75
 param$hb.minimum = -Inf
 param$hb.maximum = Inf
 
-param$donationdata = file.path(param$wd,'donationdata.Rdata')
+# param$donationdata = file.path(param$wd,'donationdata.Rdata')
+param$donationdata = file.path('~/data/data_timo.rdata')
 
 # The number of intended decimals in Hb values
 # Typically 0 for g/L, 1 for g/dL and mmol/L
@@ -128,6 +129,7 @@ if (param$country == 'NL') {
   # for NL the correct Sex and DateofBirth is in donations... sorry this is a bit cumbersome
   param$hb.minimum = 1
   param$hb.maximum = 20
+  param$hb.decimals = 1 #just to be sure
   # MP: Funky hour extraction for NL...
   param$extractHour = function(simple){ 
     return(ifelse(is.na(simple$DonationTimeStart), NA_integer_, as.integer(substr(simple$DonationTimeStart, 1, 2))))
@@ -153,7 +155,7 @@ if (param$country == 'NL') {
 
 # automated reasoning in case param$hb.decimals is not set
 if (is.na(param$hb.decimals)) {
-  if (param$param$units %in% c('mmol/L','g/dL'))
+  if (param$units %in% c('mmol/L','g/dL'))
     hb.decimals = 1
   else
     hb.decimals = 0
