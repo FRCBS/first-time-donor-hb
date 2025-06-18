@@ -48,6 +48,16 @@ completeness and to enable additional analyses.
 provided works when the time information is included in **DonationTimeDTTM** 
 column in **donationdata$donation** in POSIXct format. The function
 can be adjusted accordingnly.
+- donation.cols, donor.cols: Some columns maybe have multiple sources in
+donationdata. These settings are vectors that specify the columns that are to be
+copied from donationdata$donation and donationdata$donor, respectively. 
+The default values are **c()** (no columns) and **c('DateOfBirth','Sex','BloodGroup'),**
+again, respectively. These values correspond to the **data-description.xlsx** file.
+That is, by default the date of birth, sex and blood group
+are copied from the donor data to the working data set. The values can be copied
+from donor.cols to donation.cols to alter the behaviour. In addition, column(s) 
+that is used to compute the hour of the donation with the day, should be added
+to **donation.cols**, as is done country-specifically under **NL** and **FI**.
 
 ## Exporting the data
 
@@ -90,8 +100,8 @@ dir.create(file.path(param$wd,"results"),showWarnings = FALSE)
 dir.create(file.path(param$wd,"log"),showWarnings = FALSE)
 param$result.file = file.path(param$wd,"results","exported-data.xlsx")
 
-param$country = 'NL'
-# param$country = 'FI'
+# param$country = 'NL'
+param$country = 'FI'
 
 param$include.na = TRUE
 param$minimum.group.size = 5
@@ -102,8 +112,9 @@ param$age.maximum = 75
 param$hb.minimum = -Inf
 param$hb.maximum = Inf
 
-# param$donationdata = file.path(param$wd,'donationdata.Rdata')
-param$donationdata = file.path('~/data/data_timo.rdata')
+# This is the default file location. If you are using a country-specific file
+# name or path, please specify it below under country-specific parameters
+param$donationdata = file.path(param$wd,'donationdata.Rdata')
 
 # The number of intended decimals in Hb values
 # Typically 0 for g/L, 1 for g/dL and mmol/L
@@ -119,7 +130,7 @@ param$donation.cols = c()
 # country-specific parameter
 param$extractHour = function(simple) {return(0)} 
 
-# Country specific settings from parameters
+# Country-specific parameter settings
 if (param$country == 'NL') {
   param$donationdata = '~/data/data_timo.rdata'
   param$units = 'mmol/L' # one of: mmol/L, or g/L or g/dL
