@@ -40,7 +40,7 @@ hard-coded by default to **donationdata.Rdata** in the working directory.
 and females, respectively. These **must be set** and expressed in **units**.
 - data.set: Which data sets should be summarised and exported. The default is
 c('donation0','donation.r','simple'), which correspond to (1) first time donations 
-(first mention of relasedID in the **donation** data set); (2) repeat donations, 
+(first mention of releaseID in the **donation** data set); (2) repeat donations, 
 i.e., other than the first mention; and (3) all donations. The primary interest 
 lies in the first donations, but other data sets are included by default for 
 completeness and to enable additional analyses.
