@@ -1,8 +1,6 @@
-# first-time-donor-hb
-Analysis of development of first time donor Hb
 ## How to run the code
 
-### Setting the parameters
+### Parameter settings
 
 Some parameters must be set for the code to run correctly. The parameters 
 are saved in the **param** list. The parameters are set in the **parameters** block
@@ -35,7 +33,7 @@ hard-coded by default to **donationdata.Rdata** in the working directory.
 and females, respectively. These **must be set** and expressed in **units**.
 - data.set: Which data sets should be summarised and exported. The default is
 c('donation0','donation.r','simple'), which correspond to (1) first time donations 
-(first mention of relasedID in the **donation** data set); (2) repeat donations, 
+(first mention of releaseID in the **donation** data set); (2) repeat donations, 
 i.e., other than the first mention; and (3) all donations. The primary interest 
 lies in the first donations, but other data sets are included by default for 
 completeness and to enable additional analyses.
@@ -43,6 +41,16 @@ completeness and to enable additional analyses.
 provided works when the time information is included in **DonationTimeDTTM** 
 column in **donationdata$donation** in POSIXct format. The function
 can be adjusted accordingnly.
+- donation.cols, donor.cols: Some columns maybe have multiple sources in
+donationdata. These settings are vectors that specify the columns that are to be
+copied from donationdata$donation and donationdata$donor, respectively. 
+The default values are **c()** (no columns) and **c('DateOfBirth','Sex','BloodGroup'),**
+again, respectively. These values correspond to the **data-description.xlsx** file.
+That is, by default the date of birth, sex and blood group
+are copied from the donor data to the working data set. The values can be copied
+from donor.cols to donation.cols to alter the behaviour. In addition, column(s) 
+that is used to compute the hour of the donation with the day, should be added
+to **donation.cols**, as is done country-specifically under **NL** and **FI**.
 
 ## Exporting the data
 
@@ -56,4 +64,3 @@ The statistics are anonymised by removing any groups with size smaller then
 the parameter **minimum.group.size** (default 5). For Hb, small and large Hb
 values with fewer observations than the limit are pooled together and inxluded
 in the exported data using specific placeholders (-1000000 and 1000000). 
-
