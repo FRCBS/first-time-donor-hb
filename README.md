@@ -1,5 +1,10 @@
 ## How to run the code
 
+### File to run
+
+The code necessary for extracting and exporting anonymised data can be found in
+[src/main-with-export.Rmd](src/main-with-export.Rmd).
+
 ### Parameter settings
 
 Some parameters must be set for the code to run correctly. The parameters 
