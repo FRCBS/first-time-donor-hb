@@ -248,8 +248,11 @@ hb.freq = NULL
 for (ds in data.sets) {
   freq0 = get(ds) %>%
     mutate(data.set=if(ds == 'simple') 'all' else ds) %>%
+    mutate(month=as.integer(month)) %>%
     group_by(data.set,year,Sex,Hb) %>%
-    summarise(n=n(),nas=sum(1*is.na(Hb)),deferred=sum(deferred,na.rm=TRUE),mean.hour=mean(hour,na.rm=TRUE),sd.hour=sd(hour,na.rm=TRUE),
+    summarise(n=n(),nas=sum(1*is.na(Hb)),deferred=sum(deferred,na.rm=TRUE),
+              mean.hour=mean(hour,na.rm=TRUE),sd.hour=sd(hour,na.rm=TRUE),
+              mean.month=mean(month,na.rm=TRUE),sd.month=sd(month,na.rm=TRUE),
               mean.age=mean(age,na.rm=TRUE),sd.age=sd(age,na.rm=TRUE),limit=min(limit),.groups='drop')
   hb.freq = if(is.null(hb.freq)) freq0 else rbind(hb.freq,freq0)
 }
@@ -267,7 +270,10 @@ anonymizeDistribution = function(freq) {
     mutate(sgn=sign(Hb)) %>%
     group_by(data.set,year,Sex,sgn) %>%
     summarise(Hb=min(sgn)*hb.inf,n2=sum(n),nas=sum(nas),deferred=sum(deferred),
-              mean.age=sum(n*mean.age)/sum(n),sd.age=NA,mean.hour=sum(n*mean.hour)/sum(n),sd.hour=NA,limit=min(limit),.groups='drop') %>%
+              mean.age=sum(n*mean.age)/sum(n),sd.age=NA,
+              mean.hour=sum(n*mean.hour)/sum(n),sd.hour=NA,
+              mean.month=sum(n*mean.month)/sum(n),sd.month=NA,
+              limit=min(limit),.groups='drop') %>%
     dplyr::select(-sgn) %>%
     rename(n=n2)
 
