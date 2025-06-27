@@ -40,7 +40,7 @@ hard-coded by default to **donationdata.Rdata** in the working directory.
 and females, respectively. These **must be set** and expressed in **units**.
 - data.set: Which data sets should be summarised and exported. The default is
 c('donation0','donation.r','simple'), which correspond to (1) first time donations 
-(first mention of relasedID in the **donation** data set); (2) repeat donations, 
+(first mention of releaseID in the **donation** data set); (2) repeat donations, 
 i.e., other than the first mention; and (3) all donations. The primary interest 
 lies in the first donations, but other data sets are included by default for 
 completeness and to enable additional analyses.
@@ -48,6 +48,16 @@ completeness and to enable additional analyses.
 provided works when the time information is included in **DonationTimeDTTM** 
 column in **donationdata$donation** in POSIXct format. The function
 can be adjusted accordingnly.
+- donation.cols, donor.cols: Some columns maybe have multiple sources in
+donationdata. These settings are vectors that specify the columns that are to be
+copied from donationdata$donation and donationdata$donor, respectively. 
+The default values are **c()** (no columns) and **c('DateOfBirth','Sex','BloodGroup'),**
+again, respectively. These values correspond to the **data-description.xlsx** file.
+That is, by default the date of birth, sex and blood group
+are copied from the donor data to the working data set. The values can be copied
+from donor.cols to donation.cols to alter the behaviour. In addition, column(s) 
+that is used to compute the hour of the donation with the day, should be added
+to **donation.cols**, as is done country-specifically under **NL** and **FI**.
 
 ## Exporting the data
 
@@ -102,8 +112,9 @@ param$age.maximum = 75
 param$hb.minimum = -Inf
 param$hb.maximum = Inf
 
-# param$donationdata = file.path(param$wd,'donationdata.Rdata')
-param$donationdata = file.path('~/data/data_timo.rdata')
+# This is the default file location. If you are using a country-specific file
+# name or path, please specify it below under country-specific parameters
+param$donationdata = file.path(param$wd,'donationdata.Rdata')
 
 # The number of intended decimals in Hb values
 # Typically 0 for g/L, 1 for g/dL and mmol/L
@@ -119,7 +130,7 @@ param$donation.cols = c()
 # country-specific parameter
 param$extractHour = function(simple) {return(0)} 
 
-# Country specific settings from parameters
+# Country-specific parameter settings
 if (param$country == 'NL') {
   param$donationdata = '~/data/data_timo.rdata'
   param$units = 'mmol/L' # one of: mmol/L, or g/L or g/dL
@@ -237,8 +248,11 @@ hb.freq = NULL
 for (ds in data.sets) {
   freq0 = get(ds) %>%
     mutate(data.set=if(ds == 'simple') 'all' else ds) %>%
+    mutate(month=as.integer(month)) %>%
     group_by(data.set,year,Sex,Hb) %>%
-    summarise(n=n(),nas=sum(1*is.na(Hb)),deferred=sum(deferred,na.rm=TRUE),mean.hour=mean(hour,na.rm=TRUE),sd.hour=sd(hour,na.rm=TRUE),
+    summarise(n=n(),nas=sum(1*is.na(Hb)),deferred=sum(deferred,na.rm=TRUE),
+              mean.hour=mean(hour,na.rm=TRUE),sd.hour=sd(hour,na.rm=TRUE),
+              mean.month=mean(month,na.rm=TRUE),sd.month=sd(month,na.rm=TRUE),
               mean.age=mean(age,na.rm=TRUE),sd.age=sd(age,na.rm=TRUE),limit=min(limit),.groups='drop')
   hb.freq = if(is.null(hb.freq)) freq0 else rbind(hb.freq,freq0)
 }
@@ -256,7 +270,10 @@ anonymizeDistribution = function(freq) {
     mutate(sgn=sign(Hb)) %>%
     group_by(data.set,year,Sex,sgn) %>%
     summarise(Hb=min(sgn)*hb.inf,n2=sum(n),nas=sum(nas),deferred=sum(deferred),
-              mean.age=sum(n*mean.age)/sum(n),sd.age=NA,mean.hour=sum(n*mean.hour)/sum(n),sd.hour=NA,limit=min(limit),.groups='drop') %>%
+              mean.age=sum(n*mean.age)/sum(n),sd.age=NA,
+              mean.hour=sum(n*mean.hour)/sum(n),sd.hour=NA,
+              mean.month=sum(n*mean.month)/sum(n),sd.month=NA,
+              limit=min(limit),.groups='drop') %>%
     dplyr::select(-sgn) %>%
     rename(n=n2)
 
