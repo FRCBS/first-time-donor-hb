@@ -10,8 +10,10 @@ output: html_document
 ### Parameter settings
 
 Some parameters must be set for the code to run correctly. The parameters 
-are saved in the **param** list. The parameters are set in the **parameters** block
-below. The parameters are:
+are saved in the **param** list. Parameters that typically change by country 
+are organised in blocks, see. e.g. under `if (param$country == 'NL')`: parameters
+for NL and FI are provided for reference. You can edit the block under 
+`if (param$country == 'xx')` locally.
 
 - wd: The working directory to be used. This is set by Rstudio to either the **src**
 or the root folder of the project, e.g., "C:/git_repot/first-time-donor-hb".
@@ -48,7 +50,7 @@ lies in the first donations, but other data sets are included by default for
 completeness and to enable additional analyses.
 - extractHour: A function to extract the hour from **donationdata**. By default,
 the function always returns 0 and no hourly data is exported. Under the country-specific
-paramters two options are included: the function defined under *param$country == 'FI'*, 
+paramters two options are included: the function defined under `param$country == 'FI'`, 
 works when the time information is included in **DonationTimeDTTM** 
 column in **donationdata$donation** in POSIXct format. The function
 can be adjusted accordingly.
