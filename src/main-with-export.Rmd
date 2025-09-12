@@ -104,8 +104,8 @@ dir.create(file.path(param$wd,"results"),showWarnings = FALSE)
 dir.create(file.path(param$wd,"log"),showWarnings = FALSE)
 param$result.file = file.path(param$wd,"results","exported-data.xlsx")
 
-# param$country = 'NL'
-param$country = 'FI'
+# nb! Please edit your country code below
+param$country = 'xx'
 
 param$include.na = TRUE
 param$minimum.group.size = 5
@@ -167,7 +167,23 @@ if (param$country == 'NL') {
   }
   param$donor.cols = c('DateOfBirth','Sex','BloodGroup')
   param$donation.cols = c('DonationTimeDTTM')
-} 
+} else if (param$country == 'xx') {
+  # nb! edit your settings here
+  param$donationdata = 'donationdata.rdata'
+  param$units = 'g/L' # one of: mmol/L or g/L or g/dL
+  param$cutoff.male = 135
+  param$cutoff.female = 125
+  param$hb.minimum = 50
+  param$hb.maximum = 250
+  param$data.sets = c('donation0','donation.r','simple')
+  param$donation.type.keys = c('Whole Blood (K)','No Donation (E)','VisitNoDonation')
+  param$hb.decimals = 0
+  param$extractHour = function(simple) {
+    return(as.integer(format(simple$DonationTimeDTTM,'%H')))
+  }
+  param$donor.cols = c('DateOfBirth','Sex','BloodGroup')
+  param$donation.cols = c('DonationTimeDTTM')
+}
 
 # automated reasoning in case param$hb.decimals is not set
 if (is.na(param$hb.decimals)) {
