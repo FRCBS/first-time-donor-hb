@@ -42,10 +42,12 @@ c('donation0','donation.r','simple'), which correspond to (1) first time donatio
 i.e., other than the first mention; and (3) all donations. The primary interest 
 lies in the first donations, but other data sets are included by default for 
 completeness and to enable additional analyses.
-- extractHour: A function to extract the hour from **donationdata**. The default 
-provided works when the time information is included in **DonationTimeDTTM** 
+- extractHour: A function to extract the hour from **donationdata**. By default,
+the function always returns 0 and no hourly data is exported. Under the country-specific
+paramters two options are included: the function defined under *param$country == 'FI'*, 
+works when the time information is included in **DonationTimeDTTM** 
 column in **donationdata$donation** in POSIXct format. The function
-can be adjusted accordingnly.
+can be adjusted accordingly.
 - donation.cols, donor.cols: Some columns maybe have multiple sources in
 donationdata. These settings are vectors that specify the columns that are to be
 copied from donationdata$donation and donationdata$donor, respectively. 
