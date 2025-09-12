@@ -32,7 +32,9 @@ are included in the analysis. The idea is to consider full blood donations,
 either successful or deferred cases.
 - hb.decimals: The number of decimals in Hb values that should be used.
 - donationdata: Path to the .Rdata file containing the data to be used. This is
-hard-coded by default to **donationdata.Rdata** in the working directory.
+hard-coded by default to **donationdata.Rdata** in the working directory. If the 
+donationdata object is already in the memory, this value can be left undefined and
+the line *load(param$donationdata)* be commented out.
 - units: HB units to be used: Shold be one of: mmol/L, or g/L or g/dL.
 - cutoff.male, cutoff.female: The required mimimum values to donate for males 
 and females, respectively. These **must be set** and expressed in **units**.
