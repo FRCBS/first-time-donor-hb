@@ -98,10 +98,11 @@ if (grepl('[/\\]src[/\\]?',param$wd)) {
 
 dir.create(file.path(param$wd,"results"),showWarnings = FALSE)
 dir.create(file.path(param$wd,"log"),showWarnings = FALSE)
-param$result.file = file.path(param$wd,"results","exported-data.xlsx")
 
-param$country = 'NL'
+# param$country = 'NL'
+param$country = 'NV'
 # param$country = 'FI'
+param$result.file = file.path(param$wd,"results",paste0("exported-data-", param$country, ".xlsx"))
 
 param$include.na = TRUE
 param$minimum.group.size = 5
@@ -129,7 +130,7 @@ param$donation.cols = c()
 # nb! In order to extract hourly data, this function should be redefined as a
 # country-specific parameter
 param$extractHour = function(simple) {return(0)} 
-
+param$units = 'g/dL'
 # Country-specific parameter settings
 if (param$country == 'NL') {
   param$donationdata = '~/data/data_timo.rdata'
@@ -162,7 +163,23 @@ if (param$country == 'NL') {
   }
   param$donor.cols = c('DateOfBirth','Sex','BloodGroup')
   param$donation.cols = c('DonationTimeDTTM')
-} 
+} else if (param$country == 'NV') {
+  param$donationdata = '~/data/navarra/donationdata.Rdata'
+  param$units = 'g/dL'
+  param$cutoff.male = 13.5 #?
+  param$cutoff.female = 12.5 #?
+  param$hb.minimum = 2
+  param$hb.maximum = 25
+  param$data.sets = c('donation0','donation.r','simple')
+  param$donation.type.keys = c('Whole Blood (K)','Other')
+  param$hb.decimals = 1
+  param$extractHour = function(simple){ 
+    return(ifelse(is.na(simple$DonationTimeStart), NA_integer_, as.integer(substr(simple$DonationTimeStart, 1, 2))))
+  }
+  param$donor.cols = c('DateOfBirth','Sex','BloodGroup')
+  param$donation.cols = c('DonationTimeStart')
+  
+}
 
 # automated reasoning in case param$hb.decimals is not set
 if (is.na(param$hb.decimals)) {

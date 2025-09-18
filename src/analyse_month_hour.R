@@ -1,138 +1,196 @@
-
 wd = getwd()
 
 library(readxl)
-library(dplyr)
-library(ggplot2)
 library(broom)
 library(reshape2)
 library(tidyverse)
+library(purrr)
+library(openxlsx)
 
-country <- 'NL'
+#set to NL or FI
+country <- 'FI'
+
 dir.create(file.path('../plots'), showWarnings = FALSE)
 plot_dir = file.path('../plots', country)
 dir.create(plot_dir, showWarnings = FALSE)
 data_file <- paste0('../results/exported-data-', country, '.xlsx')
 
 sheets <- excel_sheets(data_file)
-dfs <- lapply(sheets, function(X) read_excel(data_file, sheet = X))
+dfs <- lapply(sheets, function(X)
+  read_excel(data_file, sheet = X))
 
 names(dfs) <- sheets
 
+#only first time donors
 data.set <- 'donation0'
 
 #For FI there is only a few months for 2024 so ignore that year, because it is biased for month
 latest_full_year <- 2024
-if (country == "FI"){
+
+#for FI, in 2000 there are many more donors, probably not all first time?
+first_full_year <- 2000
+if (country == "FI") {
   latest_full_year <- 2023
+  
 }
 
-df_monthly <-dfs[['montly.statistics']] %>% filter(data.set == data.set, year <= latest_full_year)
+if (country == "NL") {
+  convert_Hb <- 1 / 0.0621
+} else if (country == "NA") {
+  convert_Hb <- 10.
+} else {
+  convert_Hb <- 1.
+}
 
-df_hourly <-dfs[['hourly.statistics']] %>% filter(data.set == data.set, year <= latest_full_year)
-df_age <-dfs[['annual.age']] %>% filter(data.set == data.set, year <= latest_full_year)
+#select data
+df_monthly <- dfs[['montly.statistics']] %>% filter(data.set == !!data.set,
+                                                    year <= latest_full_year,
+                                                    year >= first_full_year)
 
-df_hb <- dfs[['annual.hb']] %>% filter(data.set == data.set, year <= latest_full_year)
+df_hourly <- dfs[['hourly.statistics']] %>% filter(data.set == !!data.set,
+                                                   year <= latest_full_year,
+                                                   year >= first_full_year)
+df_age <- dfs[['annual.age']] %>% filter(data.set == !!data.set,
+                                         year <= latest_full_year,
+                                         year >= first_full_year)
+
+df_hb <- dfs[['annual.hb']] %>% filter(data.set == !!data.set,
+                                       year <= latest_full_year,
+                                       year >= first_full_year)
 df_hb <- df_hb %>% filter(Hb > 0, Hb < 200)
 
+#Function for weighted mean/sd
+weighted_mean <- function(x, w) {
+  #w = 1/sd^2
+  sum(x * w, na.rm = TRUE) / sum(w, na.rm = TRUE)
+}
 
-df_age <- df_age %>% na.omit()
-
-age_summary <- df_age %>% mutate(age=as.numeric(age)) %>% group_by(Sex, age) %>%
-  summarise(Hb.mean=sum(mean.hb*sd.hb^2*n)/sum(n*sd.hb^2), n_=sum(n), Hb.sd=sqrt(sum(sd.hb^2*n)/sum(n)))
-
-spl_age <- age_summary %>% split(age_summary$Sex) %>% map(\(df) smooth.spline(df$age, df$Hb.mean, w=df$n_/df$Hb.sd^2, cv=T))
-
-x <- seq(min(age_summary$age), max(age_summary$age), 1)
-pred_m <- data.frame(age=x, Hb.mean=predict(spl_age$Male, x)$y, Sex='Male')
-pred_f <- data.frame(age=x, Hb.mean=predict(spl_age$Female, x)$y, Sex='Female')
-pred_age <- rbind(pred_m, pred_f)
-ggplot(age_summary, aes(age, Hb.mean, col=Sex)) +
-  geom_point() + 
-  geom_linerange(aes(ymin=Hb.mean-Hb.sd/sqrt(n_), ymax=Hb.mean+Hb.sd/sqrt(n_))) +
-  geom_line(data=pred_age, aes(age, Hb.mean))
-
-ggsave(file.path(plot_dir, 'mean_Hb_vs_age.png'))
-
-df_monthly <- df_monthly %>% mutate(mean.hb=mean, sd.hb=sd) %>% na.omit()
-
-month_summary <- df_monthly %>% mutate(month=as.numeric(month)) %>% group_by(Sex, month) %>%
-  summarise(Hb.mean=sum(mean.hb*sd.hb^2*n)/sum(n*sd.hb^2), n_=sum(n), Hb.sd=sqrt(sum(sd.hb^2*n)/sum(n)))
-
-spl_month <- month_summary %>% split(month_summary$Sex) %>% map(\(df) smooth.spline(df$month, df$Hb.mean, w=df$n_/df$Hb.sd^2, cv=T))
-
-x <- seq(min(month_summary$month), max(month_summary$month), 1)
-pred_m <- data.frame(month=x, Hb.mean=predict(spl_month$Male, x)$y, Sex='Male')
-pred_f <- data.frame(month=x, Hb.mean=predict(spl_month$Female, x)$y, Sex='Female')
-pred_month <- rbind(pred_m, pred_f)
-ggplot(month_summary, aes(month, Hb.mean, col=Sex)) +
-  geom_point() + 
-  geom_linerange(aes(ymin=Hb.mean-Hb.sd/sqrt(n_), ymax=Hb.mean+Hb.sd/sqrt(n_))) +
-  geom_line(data=pred_month, aes(month, Hb.mean))
-
-ggsave(file.path(plot_dir, 'mean_Hb_vs_month.png'))
+weighted_sd_average <- function(sds, Ns) {
+  weights <- Ns / sds^2
+  weighted_var <- sum(weights * sds^2) / sum(weights)
+  sqrt(weighted_var)
+}
 
 
-df_hourly <- df_hourly %>% mutate(mean.hb=mean, sd.hb=sd) %>% na.omit()
 
-hour_summary <- df_hourly %>% mutate(hour=as.numeric(hour)) %>% group_by(Sex, hour) %>%
-  summarise(Hb.mean=sum(mean.hb*sd.hb^2*n)/sum(n*sd.hb^2), n_=sum(n), Hb.sd=sqrt(sum(sd.hb^2*n)/sum(n)))
-
-spl_hour <- hour_summary %>% split(hour_summary$Sex) %>% map(\(df) smooth.spline(df$hour, df$Hb.mean, w=df$n_/df$Hb.sd^2, cv=T))
-
-x <- seq(min(hour_summary$hour), max(hour_summary$hour), 1)
-pred_m <- data.frame(hour=x, Hb.mean=predict(spl_hour$Male, x)$y, Sex='Male')
-pred_f <- data.frame(hour=x, Hb.mean=predict(spl_hour$Female, x)$y, Sex='Female')
-pred_hour <- rbind(pred_m, pred_f)
-ggplot(hour_summary, aes(hour, Hb.mean, col=Sex)) +
-  geom_point() + 
-  geom_linerange(aes(ymin=Hb.mean-Hb.sd/sqrt(n_), ymax=Hb.mean+Hb.sd/sqrt(n_))) +
-  geom_line(data=pred_hour, aes(hour, Hb.mean))
-
-ggsave(file.path(plot_dir, 'mean_Hb_vs_hour.png'))
-
+# Take (weighted!) mean of Hb, age, month, hour for each year
 hb_summary <- df_hb %>% na.omit() %>%
   group_by(Sex, year) %>%
-  summarise(Hb = sum(Hb*n)/sum(n), hour = sum(mean.hour*n*sd.hour^2)/sum(n*sd.hour^2),
-            age = sum(mean.age*n*sd.age^2)/sum(n*sd.age^2), month = sum(mean.month*n*sd.month^2)/sum(n*sd.month^2))
+  summarise(
+    Hb.mean = weighted_mean(Hb, n),
+    Hb.sd = sqrt(sum(n * (Hb - Hb.mean)^2) / sum(n)),
+    hour.mean = weighted_mean(mean.hour, n / sd.hour^2),
+    hour.sd = weighted_sd_average(sd.hour, n),
+    age.mean = weighted_mean(mean.age, n / sd.age^2),
+    age.sd = weighted_sd_average(sd.age, n),
+    month.mean = weighted_mean(mean.month, n / sd.month),
+    month.sd = weighted_sd_average(sd.month, n),
+    n_ = sum(n)
+  )
 
-hb_summary <- hb_summary %>%
-  group_by(Sex) %>%
-  mutate(pred_age = predict(spl_age[[first(Sex)]], age)$y, pred_age_mean=mean(pred_age),
-         pred_hour = predict(spl_hour[[first(Sex)]], hour)$y, , pred_hour_mean=mean(pred_hour),
-         pred_month = predict(spl_month[[first(Sex)]], month)$y, , pred_month_mean=mean(pred_month)) %>%
-  ungroup()
+#Just for inspection of year vs age/month/hour
+age_summary <- df_age %>% group_by(Sex, age) %>% summarise(mean_Hb = weighted_mean(mean.hb, n /
+                                                                                     sd.hb^2))
+month_summary <- df_monthly %>% group_by(Sex, month) %>% summarise(mean_Hb = weighted_mean(mean, n /
+                                                                                             sd^2))
+hour_summary <- df_hourly %>% group_by(Sex, hour) %>% summarise(mean_Hb = weighted_mean(mean, n /
+                                                                                          sd^2))
+
+#Overall means of Hb
+means <- as.list(deframe(df_hb %>% group_by(Sex) %>% summarise(mean_Hb =
+                                                                 sum(Hb * n) / sum(n))))
+
+#Logic is as follows:
+# Calculate (weighted) mean of Hb for each age/hour/month. Then using this "model" for Hb vs age/hour/month
+#Calculate the correction per (groupby) that is again the weighted mean of all "model_hb", weighted by n the number
+#of donors with that age. The correction for each year is then Hb_corr - mean(all sex specific Hbs).
+
+age_corr <- df_age %>% group_by(Sex, age) %>%
+  mutate(model_hb = weighted_mean(mean.hb, n / sd.hb^2)) %>%
+  group_by(Sex, year) %>%
+  summarise(Hb_corr = weighted_mean(model_hb, n)) %>%
+  group_by(Sex) %>% mutate(corr_age = Hb_corr - means[[first(Sex)]])  %>% select(!Hb_corr)
+
+hour_corr <- df_hourly %>% group_by(Sex, hour) %>%
+  mutate(mean_hb = weighted_mean(mean, n / sd^2)) %>%
+  group_by(Sex, year) %>%
+  summarise(Hb_corr = weighted_mean(mean_hb, n)) %>%
+  group_by(Sex) %>% mutate(corr_hour = Hb_corr - means[[first(Sex)]])   %>% select(!Hb_corr)
+
+month_corr <- df_monthly %>% group_by(Sex, month) %>%
+  mutate(mean_hb = weighted_mean(mean, n / sd^2)) %>%
+  group_by(Sex, year) %>%
+  summarise(Hb_corr = weighted_mean(mean_hb, n)) %>%
+  group_by(Sex) %>% mutate(corr_month = Hb_corr - means[[first(Sex)]])  %>% select(!Hb_corr)
+
+#need to substract correction
+#e.g. there are more younger people in 2016, so the Hb in males is higher because of that, so should subtract
+#the correction because it is positive
+corrected_hb_year <- hb_summary %>% left_join(age_corr) %>% left_join(hour_corr) %>% left_join(month_corr) %>%
+  mutate(corr_total = corr_age + corr_hour + corr_month,
+         Hb_total_corr = Hb.mean - corr_total)
 
 
+#Save corrected Hb vs year
+write.xlsx(corrected_hb_year,
+           paste0('../results/hb_year_corrected_', country, '.xlsx'))
 
-hb_summary <- hb_summary %>% mutate(Hb_corr_age=Hb-pred_age+pred_age_mean,
-                                    Hb_corr_hour=Hb-pred_hour+pred_hour_mean,
-                                    Hb_corr_month=Hb-pred_month+pred_month_mean,
-                                    Hb_corr_all=Hb-pred_age-pred_hour-pred_month+pred_age_mean+pred_hour_mean+pred_month_mean)
+ggplot(age_summary, aes(age, mean_Hb)) + 
+  geom_point() + 
+  geom_smooth() + 
+  facet_wrap(vars(Sex), scale = 'free')
 
-melt(hb_summary, id.vars=c("Sex", "year"),
-     measure.vars=c('Hb', 'age', 'month', 'hour')) %>%
-  ggplot(aes(x=year, y=value, col=Sex)) +
+#Some plotting
+test <- corrected_hb_year
+ggplot(
+  melt(
+    test,
+    id.vars = c("Sex", "year"),
+    measure.vars = c('corr_age', 'corr_hour', 'corr_month', 'corr_total')
+  ),
+  aes(
+    x = year,
+    y = value * convert_Hb,
+    col = variable
+  )
+) +
+  geom_smooth() +
+  facet_wrap(vars(Sex), scale = 'free')
+
+melt(
+  hb_summary,
+  id.vars = c("Sex", "year"),
+  measure.vars = c('age.mean', 'month.mean', 'hour.mean')
+) %>%
+  ggplot(aes(x = year, y = value, col = Sex)) +
   geom_point() +
   geom_smooth() +
-  facet_wrap(vars(variable), scales='free')
+  facet_wrap(vars(variable), scales = 'free')
 
-ggsave(file.path(plot_dir, 'mean_Hb_age_month_hour_vs_year.png'))
+ggplot(test) +
+  aes(x = year, y = Hb_total_corr * convert_Hb) +
+  geom_point(color='blue') +
+  geom_linerange(aes(
+    ymin = (Hb_total_corr - Hb.sd / sqrt(n_)) * convert_Hb,
+    ymax = (Hb_total_corr + Hb.sd / sqrt(n_)) * convert_Hb
+  )) +
+  geom_smooth(method = 'lm', color='blue') +
+  facet_wrap(vars(Sex), scale = 'free') +
+  geom_point(aes(year, Hb.mean * convert_Hb), color = 'red') +
+  geom_smooth(aes(year, Hb.mean * convert_Hb),
+              method = 'lm',
+              color = 'red')
 
 
-ggplot(melt(hb_summary, id.vars=c("Sex", "year"),
-            measure.vars=c('Hb', 'Hb_corr_age', 'Hb_corr_month', 'Hb_corr_hour', 'Hb_corr_all')),
-       aes(x=year, y=value, col=variable)) +
-  geom_point() +
-  geom_smooth(method='lm', aes(fill=variable), alpha=0.2) +
-  facet_wrap(vars(Sex), scale='free') 
 
-ggsave(file.path(plot_dir, 'mean_Hb_vs_year_corrected.png'))
-
-
-#Idea:
-#First get correction by age
-#Then correct month and hour average Hb for age
-#Then get correction for month and hour
-#then correct yearly Hb with above...?
-
+coefficients_df <- test %>%
+  mutate(
+    x = (year - 2020),
+    y = Hb_total_corr * convert_Hb,
+    w = Hb.sd / sqrt(n_) * convert_Hb
+  ) %>%
+  group_by(Sex) %>%
+  nest() %>%
+  mutate(model = map(data, ~ lm(y ~ x, weights = w, data = .)), coef = map(model, tidy)) %>%
+  select(Sex, coef) %>%
+  unnest(coef)
