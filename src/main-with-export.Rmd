@@ -10,8 +10,10 @@ output: html_document
 ### Parameter settings
 
 Some parameters must be set for the code to run correctly. The parameters 
-are saved in the **param** list. The parameters are set in the **parameters** block
-below. The parameters are:
+are saved in the **param** list. Parameters that typically change by country 
+are organised in blocks, see. e.g. under `if (param$country == 'NL')`: parameters
+for NL and FI are provided for reference. You can edit the block under 
+`if (param$country == 'xx')` locally.
 
 - wd: The working directory to be used. This is set by Rstudio to either the **src**
 or the root folder of the project, e.g., "C:/git_repot/first-time-donor-hb".
@@ -34,7 +36,9 @@ are included in the analysis. The idea is to consider full blood donations,
 either successful or deferred cases.
 - hb.decimals: The number of decimals in Hb values that should be used.
 - donationdata: Path to the .Rdata file containing the data to be used. This is
-hard-coded by default to **donationdata.Rdata** in the working directory.
+hard-coded by default to **donationdata.Rdata** in the working directory. If the 
+donationdata object is already in the memory, this value can be left undefined and
+the line *load(param$donationdata)* be commented out.
 - units: HB units to be used: Shold be one of: mmol/L, or g/L or g/dL.
 - cutoff.male, cutoff.female: The required mimimum values to donate for males 
 and females, respectively. These **must be set** and expressed in **units**.
@@ -44,10 +48,12 @@ c('donation0','donation.r','simple'), which correspond to (1) first time donatio
 i.e., other than the first mention; and (3) all donations. The primary interest 
 lies in the first donations, but other data sets are included by default for 
 completeness and to enable additional analyses.
-- extractHour: A function to extract the hour from **donationdata**. The default 
-provided works when the time information is included in **DonationTimeDTTM** 
+- extractHour: A function to extract the hour from **donationdata**. By default,
+the function always returns 0 and no hourly data is exported. Under the country-specific
+paramters two options are included: the function defined under `param$country == 'FI'`, 
+works when the time information is included in **DonationTimeDTTM** 
 column in **donationdata$donation** in POSIXct format. The function
-can be adjusted accordingnly.
+can be adjusted accordingly.
 - donation.cols, donor.cols: Some columns maybe have multiple sources in
 donationdata. These settings are vectors that specify the columns that are to be
 copied from donationdata$donation and donationdata$donor, respectively. 
@@ -100,8 +106,8 @@ dir.create(file.path(param$wd,"results"),showWarnings = FALSE)
 dir.create(file.path(param$wd,"log"),showWarnings = FALSE)
 param$result.file = file.path(param$wd,"results","exported-data.xlsx")
 
-# param$country = 'NL'
-param$country = 'FI'
+# nb! Please edit your country code below
+param$country = 'xx'
 
 param$include.na = TRUE
 param$minimum.group.size = 5
@@ -113,7 +119,8 @@ param$hb.minimum = -Inf
 param$hb.maximum = Inf
 
 # This is the default file location. If you are using a country-specific file
-# name or path, please specify it below under country-specific parameters
+# name or path, please specify it below under country-specific parameters.
+# nb! If donationdata is already available in memory, the following line need not be run.
 param$donationdata = file.path(param$wd,'donationdata.Rdata')
 
 # The number of intended decimals in Hb values
@@ -162,7 +169,23 @@ if (param$country == 'NL') {
   }
   param$donor.cols = c('DateOfBirth','Sex','BloodGroup')
   param$donation.cols = c('DonationTimeDTTM')
-} 
+} else if (param$country == 'xx') {
+  # nb! edit your settings here
+  param$donationdata = 'donationdata.rdata'
+  param$units = 'g/L' # one of: mmol/L or g/L or g/dL
+  param$cutoff.male = 135
+  param$cutoff.female = 125
+  param$hb.minimum = 50
+  param$hb.maximum = 250
+  param$data.sets = c('donation0','donation.r','simple')
+  param$donation.type.keys = c('Whole Blood (K)','No Donation (E)','VisitNoDonation')
+  param$hb.decimals = 0
+  param$extractHour = function(simple) {
+    return(as.integer(format(simple$DonationTimeDTTM,'%H')))
+  }
+  param$donor.cols = c('DateOfBirth','Sex','BloodGroup')
+  param$donation.cols = c('DonationTimeDTTM')
+}
 
 # automated reasoning in case param$hb.decimals is not set
 if (is.na(param$hb.decimals)) {
@@ -174,8 +197,10 @@ if (is.na(param$hb.decimals)) {
 ```
 
 ```{r load-data}
-# The data is expected to be in the same for as in the long-term forecasts project, except for
-# the column 'Hb' added in the donation table. The units used in Finland is g/l.
+# The data is expected to be in the same for as in the long-term forecasts project at
+# https://github.com/FRCBS/donor-recruitment-prediction/
+# except for the column 'Hb' added in the donation table. The units used in Finland is g/l.
+# nb! If donationdata is already available in memory, this chunk/the following line need not be run.
 load(param$donationdata)
 ```
 

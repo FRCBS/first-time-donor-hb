@@ -8,8 +8,12 @@ The code necessary for extracting and exporting anonymised data can be found in
 ### Parameter settings
 
 Some parameters must be set for the code to run correctly. The parameters 
-are saved in the **param** list. The parameters are set in the **parameters** block
-below. The parameters are:
+are saved in the **param** list. Parameters that typically change by country 
+are organised in blocks, see. e.g. under `if (param$country == 'NL')`: parameters
+for NL and FI are provided for reference. You can edit the block under 
+`if (param$country == 'xx')` locally.
+
+The parameters are:
 
 - wd: The working directory to be used. This is set by Rstudio to either the **src**
 or the root folder of the project, e.g., "C:/git_repot/first-time-donor-hb".
@@ -32,7 +36,9 @@ are included in the analysis. The idea is to consider full blood donations,
 either successful or deferred cases.
 - hb.decimals: The number of decimals in Hb values that should be used.
 - donationdata: Path to the .Rdata file containing the data to be used. This is
-hard-coded by default to **donationdata.Rdata** in the working directory.
+hard-coded by default to **donationdata.Rdata** in the working directory. If the 
+donationdata object is already in the memory, this value can be left undefined and
+the line *load(param$donationdata)* be commented out.
 - units: HB units to be used: Shold be one of: mmol/L, or g/L or g/dL.
 - cutoff.male, cutoff.female: The required mimimum values to donate for males 
 and females, respectively. These **must be set** and expressed in **units**.
@@ -42,10 +48,12 @@ c('donation0','donation.r','simple'), which correspond to (1) first time donatio
 i.e., other than the first mention; and (3) all donations. The primary interest 
 lies in the first donations, but other data sets are included by default for 
 completeness and to enable additional analyses.
-- extractHour: A function to extract the hour from **donationdata**. The default 
-provided works when the time information is included in **DonationTimeDTTM** 
+- extractHour: A function to extract the hour from **donationdata**. By default,
+the function always returns 0 and no hourly data is exported. Under the country-specific
+paramters two options are included: the function defined under `param$country == 'FI'`, 
+works when the time information is included in **DonationTimeDTTM** 
 column in **donationdata$donation** in POSIXct format. The function
-can be adjusted accordingnly.
+can be adjusted accordingly.
 - donation.cols, donor.cols: Some columns maybe have multiple sources in
 donationdata. These settings are vectors that specify the columns that are to be
 copied from donationdata$donation and donationdata$donor, respectively. 
