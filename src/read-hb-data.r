@@ -38,14 +38,132 @@ for (file in file.paths) {
 	for (sn in sheet.names) {
 		data = read.xlsx(file,colNames=TRUE,rowNames=FALSE,sheet = sn)
 		if (sn == 'parameters') {
-			curr$parameters = data
+			curr$parameters=data
 		} else {
-			curr[[sn]]=data
+			curr[[sn]]=cbind(country=identifier,data)
 		}
 	}
 	
 	countries[[identifier]] = curr
 }
+
+# join the data sets from different countries to single variables
+for (nm in names(countries[[1]])) {
+	if (nm=='parameters')
+		next
+
+	tab.list=lapply(countries,FUN=function(x) x[[nm]])
+	data=do.call(rbind,tab.list)
+	if ('data.set' %in% colnames(data)) {
+		data$data.set[data$data.set=='simple']='all'
+	}
+
+	colnames(data)=sub('\\.hb$','',colnames(data))
+
+	colnames(data)=tolower(colnames(data))
+
+	assign(nm,data)	
+}
+
+annual.hb.dist=annual.hb
+monthly=montly.statistics
+rm(montly.statistics)
+
+margins=list()
+margins[['month']]=monthly
+margins[['age']]=annual.age
+margins[['hour']]=hourly.statistics
+
+annual.hb = annual.hb.dist %>%
+	filter(abs(hb)!=1000000) %>%
+	group_by(data.set,sex,country,year) %>%
+	summarise(n.donor=sum(n),hb=sum(hb*n)/sum(n),.groups='drop') %>%
+	data.frame()
+annual.hb
+
+# names(countries$fi)
+pdf('../margins.pdf')
+mar.res=list()
+for (nm in names(margins)) {
+	print(paste('****',nm))
+	df=inner_join(margins[[nm]],annual.hb,join_by(country,sex,year,data.set)) %>% 
+		filter(data.set=='donation0') %>% 
+		mutate(hb.dev=mean-hb)
+
+	df[[nm]]=as.character(df[[nm]])
+
+	rlist=by(df,df[,c('sex','country')],function(x) {
+			frml.char=paste0('hb.dev~',nm,'+0')
+			m=lm(formula(frml.char),data=x)
+			sm=summary(m)
+			print(sm)
+			df=data.frame(sm$coeff)
+			tv=-qt(0.025,df=sm$df[2])
+			df=data.frame(country=x$country[1],sex=x$sex[1],var=nm,level=as.integer(sub(nm,'',rownames(df))),df,
+				lower=df$Estimate-tv*df$Std..Error,upper=df$Estimate+tv*df$Std..Error) %>%
+				arrange(country,sex,level)
+			return(df)
+		})
+	var.data=do.call(rbind,rlist)
+
+	pp.cols=list(Male='blue3',Female='red3')
+	plot(x=NULL,xlim=c(min(var.data$level),max(var.data$level)),ylim=c(min(var.data$lower),max(var.data$upper)),
+		main=paste(nm))
+	by(var.data,var.data[,c('country','sex')],function(x) {
+			sex0=x$sex[1]
+			country0=x$country[1]
+			lines(x$level,x$Estimate,col=pp.cols[[sex0]],lwd=2)
+			lines(x$level,x$upper,col=pp.cols[[sex0]],lwd=1,lty='dashed')
+			lines(x$level,x$lower,col=pp.cols[[sex0]],lwd=1,lty='dashed')
+		})
+
+	mar.res[[nm]]=var.data
+}
+dev.off()
+
+crtn=do.call(rbind,mar.res)
+crtn$level=as.character(crtn$level)
+mdf=do.call(rbind,lapply(names(margins),FUN=function(x) {
+		df=margins[[x]]
+		colnames(df)=sub(paste0('^',x,'$'),'level',colnames(df))
+		wh=which(grepl('\\.age$',colnames(df)))
+		if (length(wh) > 0) 
+			df=df[-wh]
+
+		return(cbind(margin=x,df))
+	}))
+
+str(mdf)
+str(crtn)
+
+# 2026-01-06 TODO
+# must join hours, maybe everything from 21(22) till 7(9) together; maybe include missing (NA) there as well
+# This could be done based on local rules, by the data: less than 1% of the cases or similar
+# remove garrisons from the Finnish data? age 19 and months 2 and 8 maybe caused by that
+# The corrections should actually be subtracted from the means? If some year has a lot of items that deviate 
+# negatively (coefficients < 0), this pushes mean-hb down, so the corrections must therefore be substracted: -(-c). OK
+# Should the correlations be weighted when estimating the corrections? Probably so. Weights all through the line.
+# Must count the annual numbers from the same data sets as the margins: the n's must add up correctly.
+
+margins[['hour']] %>%
+	group_by(hour) %>%
+	summarise(n2=sum(n)) %>%
+	data.frame() %>%
+	summarise(sum(n2))
+
+mdf[1,]
+crtn[1,]
+df=inner_join(mdf,crtn,join_by(country,x$margin==y$var,sex,level)) %>% 
+	mutate(cterm=n*Estimate)
+
+df2=df %>% 
+	group_by(country,sex,year) %>%
+	summarise(n=n(),cterm2=sum(cterm),.groups='drop') %>%
+	data.frame()
+df2
+
+df[1:100,]
+
  
 # read anonymous data files %%% -->
 
