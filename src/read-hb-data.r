@@ -25,6 +25,46 @@ file.names = file.names[!grepl('survival',file.names)]
 file.names = file.names[grepl('.xlsx$',file.names)]
 file.paths = paste(param$data.dir,file.names,sep='')
 
+plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c('Estimate','lower','upper'),
+		ltys=list(cm='dashed',fi='solid'),colours=list(Male='blue3',Female='red3'),main='') {
+
+	xmin=min(data[[xcol]][data[[xcol]]>=0])-1
+	ylim=c(min(data[,ycols]),max(data[,ycols]))
+	yspan=(ylim[2]-ylim[1])
+	plot(x=NULL,xlim=c(xmin,max(data[[xcol]])),ylim=c(ylim[1]-0.5*yspan,ylim[2]),
+		main=main,xlab=xcol,ylab=ycols[1])
+	lgnd=by(data,data[,group.cols],function(x) {
+			sex0=x[1,group.cols[1]] 
+			country0=x[1,group.cols[2]] 
+
+			col0=pp.cols[[sex0]]
+
+			wh = which(x[[xcol]]==-1)
+			if (length(wh) > 0) {
+				x0=min(x[[xcol]][-wh])-1+0.1*if(sex0=='Male') 0.2 else 0
+				arrows(x0,x[[ycols[2]]][wh],x0,x[[ycols[1]]][wh],length=0.05,angle=90,code=3,col=col0,lwd=1.5)
+				arrows(x0,x[[ycols[1]]][wh],x0,x[[ycols[3]]][wh],length=0.05,angle=90,code=3,col=col0,lwd=1.5)
+				x=x[-wh,]
+			}
+
+			m=lm(x[[ycols[1]]]~x[[xcol]])
+
+			lines(x[[xcol]],x[[ycols[1]]],col=col0,lwd=2,lty=ltys[[country0]])
+			lines(x[[xcol]],x[[ycols[3]]],col=col0,lwd=1,lty='dashed')
+			lines(x[[xcol]],x[[ycols[2]]],col=col0,lwd=1,lty='dashed')
+
+			sm=summary(m)
+			cf=round(sm$coeff,3)
+			print(summary(m))
+			text=paste0('b=',sprintf(cf[2,1],fmt='%.3f'),', p=',cf[2,4])
+			data.frame(text=paste(text,country0),b=cf[2,1],p=cf[2,4],lty=ltys[[country0]],col=col0)
+		})
+	# bsAssign('lgnd')
+	# legend=paste(lgnd)
+	legend.data=do.call(rbind,lgnd)
+	legend(x='bottom',legend=legend.data$text,col=legend.data$col,lty=legend.data$lty,lwd=2)
+}
+
 countries = list()
 gt = NULL
 for (file in file.paths) {
@@ -74,15 +114,113 @@ margins[['month']]=monthly
 margins[['age']]=annual.age
 margins[['hour']]=hourly.statistics
 
+hour.total = hourly.statistics %>%
+	group_by(country,data.set,sex) %>%
+	summarise(n2=sum(n),.groups='drop')
+
+# groups for hours by country,data.set,hour,sex: separately values
+# with at least 0.001 of the total donations; group the rest together
+hour.groups=hourly.statistics %>%
+	group_by(country,data.set,hour,sex) %>%
+	summarise(n=sum(n),.groups='drop') %>%
+	inner_join(hour.total,join_by(country,data.set,sex)) %>%
+	mutate(prop=n/n2,saved=prop>0.001&!is.na(hour),
+		na.group=(!is.na(hour)*(-1))-1,
+		nr.group=((saved&!is.na(hour))*coalesce(hour,0)),
+		hour.group=(nr.group>0)*(nr.group+1)-1) %>%
+	dplyr::select(country,data.set,hour,sex,hour.group) %>%
+	data.frame()
+
+str(hourly.statistics)
+table(hourly.statistics$data.set)
+str(hourly.grouped)
+
+hourly.grouped=hourly.statistics %>%
+	inner_join(hour.groups,join_by(country,data.set,hour,sex)) %>%
+	group_by(country,data.set,year,sex,hour.group) %>%
+	summarise(mean=sum(n*mean)/sum(n),n=sum(n),nas=sum(nas),deferred=sum(deferred),.groups='drop') %>%
+	rename(hour=hour.group) %>%
+	dplyr::select(country,data.set,year,sex,hour,n,nas,deferred,mean)
+
+# use the newly formed grouped hourly statistics instead of the original one
+margins[['hour']]=hourly.grouped
+
 annual.hb = annual.hb.dist %>%
 	filter(abs(hb)!=1000000) %>%
 	group_by(data.set,sex,country,year) %>%
 	summarise(n.donor=sum(n),hb=sum(hb*n)/sum(n),.groups='drop') %>%
 	data.frame()
-annual.hb
+
+totals=lapply(names(margins),FUN=function(nm) {
+		margins[[nm]] %>%
+			group_by(country,data.set,sex) %>%
+			summarise(n2=sum(n),.groups='drop') %>%
+			mutate(var=nm)
+	})
+names(totals)=names(margins)
+
+totals.year=lapply(names(margins),FUN=function(nm) {
+		margins[[nm]] %>%
+			group_by(country,data.set,sex,year) %>%
+			summarise(n2=sum(n),.groups='drop') %>%
+			mutate(var=nm)
+	})
+names(totals.year)=names(margins)
+
+# 2026-01-12
+str(margins[['hour']])
+
+dist=lapply(names(margins),FUN=function(nm) {
+		margins[[nm]] %>%
+			group_by(country,data.set,sex,!!!syms(nm)) %>%
+			summarise(n2=sum(n),.groups='drop') %>%
+			mutate(var=nm) %>%
+			rename(level=nm) %>%
+			full_join(totals[[nm]],join_by(country,data.set,sex,var),suffix=c('','.total')) %>%
+			mutate(prop=n2/n2.total)
+	})
+dist=do.call(rbind,dist)
+
+dist.year=lapply(names(margins),FUN=function(nm) {
+		margins[[nm]] %>%
+			group_by(country,data.set,sex,year,!!!syms(nm)) %>%
+			summarise(n2=sum(n),.groups='drop') %>%
+			mutate(var=nm) %>%
+			rename(level=nm) %>%
+			full_join(totals.year[[nm]],join_by(country,data.set,sex,var,year),suffix=c('','.total')) %>%
+			mutate(prop=n2/n2.total)
+	})
+dist.year=do.call(rbind,dist.year)
+
+# Test plot for the distributions
+plot(x=NULL,xlim=c(-1,12),ylim=c(0,0.20))
+yd=dist.year %>% filter(data.set=='donation0',sex=='Male',var=='month')
+yd0=dist %>% filter(data.set=='donation0',sex=='Male',var=='month') %>%
+			mutate(level.num=as.numeric(level)) %>%
+			arrange(level.num)
+
+by(yd,yd[,c('country','year','sex')],function(x) {
+		x=x%>%
+			mutate(level.num=as.numeric(level)) %>%
+			arrange(level.num)
+
+		lines(x$level,x$prop)
+	})
+lines(yd0$level,yd0$prop,col='red3',lwd=3)
+
+dist.year[1,]
+dist[1,]
+dist.diff=inner_join(dist.year,dist,join_by(country,data.set,sex,var,level),suffix=c('','0')) %>%
+	mutate(diff=prop-prop0)
+dist.diff[1,]
+hist(dist.diff$prop-dist.diff$prop0)
+
+dd.sorted=dist.diff %>% arrange(diff)
+plot(dd.sorted$diff)
 
 # names(countries$fi)
-pdf('../margins.pdf')
+getwd()
+pdf('../results/margins.pdf')
 mar.res=list()
 for (nm in names(margins)) {
 	print(paste('****',nm))
@@ -94,7 +232,7 @@ for (nm in names(margins)) {
 
 	rlist=by(df,df[,c('sex','country')],function(x) {
 			frml.char=paste0('hb.dev~',nm,'+0')
-			m=lm(formula(frml.char),data=x)
+			m=lm(formula(frml.char),weights=n,data=x)
 			sm=summary(m)
 			print(sm)
 			df=data.frame(sm$coeff)
@@ -107,14 +245,26 @@ for (nm in names(margins)) {
 	var.data=do.call(rbind,rlist)
 
 	pp.cols=list(Male='blue3',Female='red3')
-	plot(x=NULL,xlim=c(min(var.data$level),max(var.data$level)),ylim=c(min(var.data$lower),max(var.data$upper)),
-		main=paste(nm))
+	xmin=min(var.data$level[var.data$level>=0])-1
+	plot(x=NULL,xlim=c(xmin,max(var.data$level)),ylim=c(min(var.data$lower),max(var.data$upper)),
+		main=paste(nm),xlab=nm,ylab='deviation from mean hb')
 	by(var.data,var.data[,c('country','sex')],function(x) {
 			sex0=x$sex[1]
 			country0=x$country[1]
-			lines(x$level,x$Estimate,col=pp.cols[[sex0]],lwd=2)
-			lines(x$level,x$upper,col=pp.cols[[sex0]],lwd=1,lty='dashed')
-			lines(x$level,x$lower,col=pp.cols[[sex0]],lwd=1,lty='dashed')
+
+			col0=pp.cols[[sex0]]
+
+			wh = which(x$level==-1)
+			if (length(wh) > 0) {
+				x0=min(x$level[-wh])-1+0.1*if(sex0=='Male') 0.2 else 0
+				arrows(x0,x$lower[wh],x0,x$Estimate[wh],length=0.05,angle=90,code=3,col=col0,lwd=1.5)
+				arrows(x0,x$Estimate[wh],x0,x$upper[wh],length=0.05,angle=90,code=3,col=col0,lwd=1.5)
+				x=x[-wh,]
+			}
+
+			lines(x$level,x$Estimate,col=col0,lwd=2)
+			lines(x$level,x$upper,col=col0,lwd=1,lty='dashed')
+			lines(x$level,x$lower,col=col0,lwd=1,lty='dashed')
 		})
 
 	mar.res[[nm]]=var.data
@@ -123,17 +273,73 @@ dev.off()
 
 crtn=do.call(rbind,mar.res)
 crtn$level=as.character(crtn$level)
-mdf=do.call(rbind,lapply(names(margins),FUN=function(x) {
-		df=margins[[x]]
+
+# the difference is computed as observed-expected
+# crtn contains the deviances per margin (mean-hb) estimated from data usin lm
+# next compute the corrections per margin: difference in proportion (dist.diff$prop) times the crtn
+# the computed corrections will be added (+) to the means
+str(crtn)
+str(dist.diff)
+
+# e.g. 20% donations in January in 2023 vs. 10% on average -> diff=10%
+# It was estimated that hb is -1 below average in January: Estimate=-1
+# One should like to add 10%*1 to the mean
+# Hence the correction should include a multiplier of -1.
+# dist.diff can now be used to compute the corrections
+
+crtn.mean=inner_join(dist.diff[dist.diff$data.set=='donation0',],crtn,join_by(country,sex,var,level)) %>%
+	mutate(correction=-diff*Estimate) %>%
+	dplyr::select(country,data.set,sex,var,level,year,correction) %>%
+	arrange(correction)
+
+str(crtn.mean)
+plot(crtn.mean$correction)
+summary(crtn.mean)
+crtn.mean # abs(min~man)=0.37: näihin ei siis tosiaankaan tikahdu
+crtn.mean[1:10,]
+
+crtn.annual=crtn.mean %>%
+	group_by(country,data.set,sex,year) %>%
+	summarise(correction=sum(correction),.groups='drop') %>%
+	data.frame()
+plot(crtn.annual$correction)
+
+plotByGroups(crtn.annual,group.cols=c('sex','country'),xcol='year',ycols=c('correction'),colours=list(Male='blue3',Female='red3'))
+hb.dummy=annual.hb %>%
+	filter(data.set=='donation0')
+plotByGroups(hb.dummy,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=list(Male='blue3',Female='red3'))
+
+hb.cmp=inner_join(crtn.annual,hb.dummy,join_by(data.set,sex,country,year,)) %>%
+	mutate(hb=hb+correction,country='cm') %>%
+	select(!!!syms(colnames(hb.dummy))) %>%
+	rbind(hb.dummy)
+
+pdf('../results/trends-corrected.pdf')
+plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=list(Male='blue3',Female='red3'),ltys=list(cm='dashed',fi='solid'))
+dev.off()
+# plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=list(Male='blue3',Female='red3'),ltys=list(cm='dashed',fi='solid'))
+
+### eof
+
+mdf=do.call(rbind,
+# tst=
+lapply(names(margins),FUN=function(x) {
+		df=margins[[x]] 
+		df=df[,colnames(df)!='sd']
 		colnames(df)=sub(paste0('^',x,'$'),'level',colnames(df))
 		wh=which(grepl('\\.age$',colnames(df)))
 		if (length(wh) > 0) 
-			df=df[-wh]
+			df=df[,-wh]
 
 		return(cbind(margin=x,df))
-	}))
+	})
+	)
 
-str(mdf)
+str(tst)
+
+# 2026-01-09 mdf contains the estimated corrections for different margins
+str(mdf) 
+
 str(crtn)
 
 # 2026-01-06 TODO
