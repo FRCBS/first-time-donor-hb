@@ -11,7 +11,12 @@ param$donation.types = c('Whole Blood (K)')
 param$max.sample.size=1e7 # This is still reasonably fast (< 1 min)
 param$hb.thold.male=135
 param$hb.thold.female=125
-param$max.ord.group.number=10
+param$max.ord.group.number=15
+
+param$omit.data=list()
+
+# For Finland, omit the donations from garrisons to create a second version of the data set
+param$omit.data$DonationPlaceType='Garrison'
 
 # getwd() might behave differently depending on the environment where it is run (console vs. Rmd),
 # therefore checking if working directory is set to the src folder and moving up if yes.
@@ -24,7 +29,7 @@ setwd(param$wd)
 
 dir.create(file.path(param$wd,"results"),showWarnings = FALSE)
 # dir.create(file.path(param$wd,"log"),showWarnings = FALSE)
-param$result.file = file.path(param$wd,"results","data.xlsx")
+param$result.file = file.path(param$wd,"results","exported-survival-data.xlsx")
 
 if (!exists('donationdata'))
 	load(param$data.file)
@@ -39,25 +44,40 @@ donationdata$donor$numid=id.map[donationdata$donor$releaseID,'numid']
 donationdata$donation$rowid=1e7+1:nrow(donationdata$donation) #as.integer(rownames(donationdata$donation))
 donationdata$donor$rowid=2e5+1:nrow(donationdata$donor) # as.integer(rownames(donationdata$donor))
 
+donationdata$donation$DonationPlaceType[is.na(donationdata$donation$DonationPlaceType)]='Office'
+for (nm in names(param$omit.data)) {
+	donationdata$donation=donationdata$donation %>%
+		filter(as.character(!!!syms(nm))!=param$omit.data[[nm]])
+}
+
 donation.simple = donationdata$donation[donationdata$donation$BloodDonationTypeKey %in% param$donation.types,c('rowid','numid','DonationDate','Hb')] %>% 
 	inner_join(donationdata$donor[,c('numid','Sex','BloodGroup','DateOfBirth')],join_by(numid)) %>%
 	arrange(numid,DonationDate)
 
 # donation.simple$dtEnd = as.Date("2020-01-01") # nb! This is set to NA later
 # donation.simple$type = 'donation'
-donation.simple$age= as.numeric(difftime(donation.simple$DonationDate,donation.simple$DateOfBirth),unit="weeks")/52.25
+# donation.simple$age= as.numeric(difftime(donation.simple$DonationDate,donation.simple$DateOfBirth),unit="weeks")/52.25
 donation.simple = donation.simple %>% 
 	group_by(numid) %>%
 	mutate(ord = row_number()) %>%
 	ungroup() %>%
-	dplyr::select(-DateOfBirth)
+	dplyr::select(-DateOfBirth) %>%
+	rename(date=DonationDate)
 
-colnames(donation.simple)=c('rowid','numid','date','hb','sex','bloodgroup','age','ord')
+str(donation.simple)
+str(donation0)
+donation0=donation.simple %>% filter(ord==1) %>% dplyr::select(numid,date) %>% rename(date0=date)
+donation.simple=donation.simple %>%
+	inner_join(donation0,join_by(numid))
+
+colnames(donation.simple)=c('rowid','numid','date','hb','sex','bloodgroup','ord','date0')
 
 donation.simple$bloodgr='other'
 donation.simple$bloodgr[donation.simple$bloodgroup=='O-']='O-'
 donation.simple$bloodgr=as.factor(donation.simple$bloodgr)
 donation.simple$bloodgr=relevel(donation.simple$bloodgr,ref='other')
+
+donation.simple$age= as.numeric(difftime(donation.simple$date0,donation.simple$date),unit="weeks")/52.25
 donation.simple$age.group=cut(donation.simple$age,breaks=c(0,25,40,100))
 
 donation.simple$ord.next=donation.simple$ord+1
@@ -167,7 +187,7 @@ cols.prefix=c('diff','event','sex','ord.group')
 spec=data.frame(hb.var=vars)
 spec.curves=data.frame(hb.var='-')
 
-getResults= function(dlink,spec) {
+getResults=function(dlink,spec) {
 	res=by(spec,spec,function(x) {
 		if (x=='-') {
 			x=NULL
@@ -200,7 +220,7 @@ colours[['O-']]='blue3'
 
 pdf('results/figures.pdf')
 by(res.models,res.models[,c('sex','var')],function(y) {
-	plot(x=NULL,type='n',xlim=c(1,11),ylim=c(0.70,1.30),main=paste(y$sex[1],y$var[1]),
+	plot(x=NULL,type='n',xlim=c(1,ord.group.number),ylim=c(0.70,1.40),main=paste(y$sex[1],y$var[1]),
 		xlab='number of donation',ylab='relative likelihood of donation')
 	abline(h=1,lwd=2,lty='dotted')
 	legend(x='bottomright',legend=unique(y$level),fill=sapply(unique(y$level),function(x) colours[[x]]))
@@ -217,6 +237,7 @@ dev.off()
 
 pdf('results/curves.pdf')
 dummy=by(res.curves,res.curves[,c('sex','ord.group')],function(df) {
+bsAssign('df')
 		wh=min(which(df$surv<0.99))
 		len0=length(df$surv)
 		df=df[wh:len0,]
