@@ -297,3 +297,4 @@ plotParameters = function(ce,xvar='log_alpha',yvar='yf',col.var='sex',pp.cols=li
 pdf('results/parameters.pdf')
 plotParameters(ce)
 dev.off()
+
