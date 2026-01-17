@@ -61,7 +61,7 @@ donation.simple = donation.simple %>%
 	group_by(numid) %>%
 	mutate(ord = row_number()) %>%
 	ungroup() %>%
-	dplyr::select(-DateOfBirth) %>%
+	# dplyr::select(-DateOfBirth) %>%
 	rename(date=DonationDate)
 
 str(donation.simple)
@@ -70,14 +70,14 @@ donation0=donation.simple %>% filter(ord==1) %>% dplyr::select(numid,date) %>% r
 donation.simple=donation.simple %>%
 	inner_join(donation0,join_by(numid))
 
-colnames(donation.simple)=c('rowid','numid','date','hb','sex','bloodgroup','ord','date0')
+colnames(donation.simple)=c('rowid','numid','date','hb','sex','bloodgroup','dateofbirth','ord','date0')
 
 donation.simple$bloodgr='other'
 donation.simple$bloodgr[donation.simple$bloodgroup=='O-']='O-'
 donation.simple$bloodgr=as.factor(donation.simple$bloodgr)
 donation.simple$bloodgr=relevel(donation.simple$bloodgr,ref='other')
 
-donation.simple$age= as.numeric(difftime(donation.simple$date0,donation.simple$date),unit="weeks")/52.25
+donation.simple$age=as.numeric(difftime(donation.simple$date0,donation.simple$dateofbirth),unit="weeks")/52.25
 donation.simple$age.group=cut(donation.simple$age,breaks=c(0,25,40,100))
 
 donation.simple$ord.next=donation.simple$ord+1

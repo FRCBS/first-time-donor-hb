@@ -9,16 +9,25 @@ library(openxlsx)
 # library(reshape2) # melt (needed in heatmaps)
 
 ## ----parameters,echo=FALSE----------------------------------------------------
-source('analysis-functions.r')
 param=list()
 param$data.dir = 'C:/Users/super/OneDrive - University of Helsinki/veripalvelu/paper-2 hemoglobin/data/'
 param$shared.dir='C:/Users/super/OneDrive - University of Helsinki/veripalvelu/paper-2 hemoglobin/hb-paper-manuscripts/'
 param$shared.dir="c:/hy-version/first-time-donor-h/submit/"
+
+if (grepl('^VP',Sys.info()[4])) {
+	setwd('C:\\git_repot\\first-time-donor-hb\\src')
+	param$data.dir = 'C:\\git_repot\\first-time-donor-hb\\results\\'
+	param$shared.dir = 'C:\\git_repot\\first-time-donor-hb\\results\\'
+}
+
+getwd()
+source('analysis-functions.r')
+
 param$png.resolution=1.4*150
 param$figure.format='pdf'
 
 ## ----read-files,echo=FALSE----------------------------------------------------
-file.names = dir(path=param$data.dir,pattern="*.xlsx")
+file.names = dir(path=param$data.dir,pattern="*hb.xlsx")
 file.names = file.names[!grepl('~',file.names)]
 file.names = file.names[!grepl('^old',file.names)]
 file.names = file.names[!grepl('survival',file.names)]
