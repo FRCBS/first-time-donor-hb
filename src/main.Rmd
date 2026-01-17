@@ -16,15 +16,39 @@ library(dplyr)
 library(lubridate)
 library(tidyr)
 library(moments)
+library(openxlsx)
 ```
+```{r working-directory-and-file-paths}
+param=list()
+param$wd = getwd()
+
+# getwd() might behave differently depending on the environment where it is run (console vs. Rmd),
+# therefore checking if working directory is set to the src folder and moving up if yes.
+if (grepl('[/\\]src[/\\]?',param$wd)) {
+   param$wd = sub('[/\\]src([/\\]?)$','\\1',param$wd)
+}
+
+dir.create(file.path(param$wd,"results"),showWarnings = FALSE)
+dir.create(file.path(param$wd,"log"),showWarnings = FALSE)
+param$result.file = file.path(param$wd,"results","data.xlsx")
+
+param$donationdata = 'C:/git_repot/DATA/donationdata.fortimo.rdata'
+
+# nb! check that the result and log files point to the right locations
+# No log is currently written in this script
+```
+
 ```{r load-data}
-load('C:/git_repot/DATA/donationdata.fortimo.rdata')
+# The data is expected to be in the same for as in the long-term forecasts project, except for
+# the column 'Hb' added in the donation table. The units used in Finland is g/l.
+load(param$donationdata)
 ```
 
 
 ```{r load-and-process-data}
-simple = donationdata$donation
-simple = left_join(simple,donationdata$donor[,c('releaseID','DateOfBirth','Sex','BloodGroup')],by='releaseID')
+simple = donationdata$donation %>%
+  filter(BloodDonationTypeKey %in% c('Whole Blood (K)','No Donation (E)')) %>%
+  left_join(simple,donationdata$donor[,c('releaseID','DateOfBirth','Sex','BloodGroup')],by='releaseID')
 simple$age= as.numeric(difftime(simple$DonationDate,simple$DateOfBirth),unit="weeks")/52.25
 simple$month = as.factor(month(simple$DonationDate))
 simple$year = year(simple$DonationDate)
@@ -39,26 +63,56 @@ date0 = simple %>%
 donation0 = simple %>%
   inner_join(date0,join_by(x$DonationDate==y$date0,releaseID))
 
-# repeat donations
+# repeat donations; sent for sentinel
 donation.r = simple %>%
   left_join(cbind(date0,sent=1),join_by(x$DonationDate==y$date0,releaseID)) %>%
   filter(is.na(sent)) %>%
   select(-sent) %>%
   mutate(month=as.integer(month))
 
-# Kuukausittaiset keskiarvot toistoluovuttajilta (toistoluovutuksista)
-seasonal = donation.r %>%
-  group_by(month) %>%
-  summarise(seasonal=mean(Hb,na.rm=TRUE),.groups='drop') %>%
-  mutate(month=as.integer(month))
-# The mutation above used to be in different context
-
-# repeat donations (?)
-donation.r = inner_join(donation.r,seasonal,join_by(month))
-
 # donation0$year=year(donation0$DonationDate)
 # donation0$year.factor=as.factor(donation0$year)
 ```
+
+```{r prepare-for-export}
+# Annual Hb distributions by Sex
+data.sets=c('donation0','donation.r','simple')
+c.freq = NULL
+for (ds in data.sets) {
+  freq = get(ds) %>%
+    mutate(data.set=if(ds == 'simple') 'all' else ds) %>%
+    group_by(data.set,year,Sex,Hb) %>%
+    summarise(n=n(),.groups='drop')
+  c.freq = if(is.null(c.freq)) freq else rbind(c.freq,freq)
+}
+
+# Annual age distributions by Sex
+data.sets=c('donation0','donation.r','simple')
+c.age.freq = NULL
+for (ds in data.sets) {
+  freq = get(ds) %>%
+    mutate(data.set=if(ds == 'simple') 'all' else ds,age=as.integer(age)) %>%
+    group_by(data.set,year,Sex,age) %>%
+    summarise(n=n(),.groups='drop')
+  c.age.freq = if(is.null(c.freq)) freq else rbind(c.age.freq,freq)
+}
+
+# Month statistics
+c.monthly = NULL
+for (ds in data.sets) {
+  monthly = get(ds) %>%
+    mutate(data.set=ds) %>%
+    group_by(data.set,year,Sex,month) %>%
+    summarise(n=n(),mean=mean(Hb,na.rm=TRUE),sd=sd(Hb,na.rm=TRUE),mean.age=mean(age,na.rm=TRUE),sd.age=sd(age,na.rm=TRUE),nas=sum(1*is.na(Hb)),.groups='drop') 
+  c.monthly = if(is.null(c.monthly)) monthly else rbind(c.monthly,monthly)
+}
+```
+
+```{r export-data}
+write.xlsx(list(annual.hb=c.freq,annual.age=c.monthly,montly.statistics=c.monthly),file=file.path(param$wd,'exported-statistics.xlsx'))
+```
+
+This is the end of the new part.
 
 ```{r function-definitions}
 plotHbDist = function(data0,sex,cutoff,zoom=TRUE) {
@@ -78,7 +132,7 @@ plotHbDist = function(data0,sex,cutoff,zoom=TRUE) {
   mean0=mean(sex0$Hb)
   sd0=sd(sex0$Hb)
   
-  text(x=135,y=0.03,labels=paste0('mean=',mean0,', sd=',sd0))
+  text(x=cutoff,y=0.03,labels=paste0('mean=',mean0,', sd=',sd0))
   
   ndist=dnorm(unique(freq$Hb),mean=mean0,sd=sd0)
   lines(unique(freq$Hb),ndist)
@@ -143,6 +197,16 @@ plotYearSex = function(m,relative=FALSE) {
 ```
 
 ```{r}
+# Monthly averages from repeat donors
+seasonal = donation.r %>%
+  group_by(month) %>%
+  summarise(seasonal=mean(Hb,na.rm=TRUE),.groups='drop') %>%
+  mutate(month=as.integer(month))
+# The mutation above used to be in different context
+
+# repeat donations augmented with the seasonal data
+donation.r = inner_join(donation.r,seasonal,join_by(month))
+
 # 2025-04-05 This seems to be a reasoable regression for the year-sex adjustment factors
 # seasonal on tässä 146.451181
 m=lm(0+Hb~age+Sex+seasonal+year.factor:Sex,data=donation.r[donation.r$year>=2002,])
@@ -345,6 +409,8 @@ rectifyDistribution = function (data0,sex,cutoff,plot=TRUE) {
 
 ```
 
+The following chunk is to be preserved
+
 ```{r}
 data0=simple
 sex='Male'
@@ -373,7 +439,8 @@ donation0$deferred[donation0$Hb<donation0$limit]=1
 basics = donation0 %>% # simple
   filter(!is.na(Hb)) %>%
   group_by(year,Sex) %>%
-  summarise(n=n(),mean0=mean(Hb,na.rm=TRUE),sd0=sd(Hb,na.rm=TRUE),deferred.perc=sum(deferred)/n(),limit=min(limit),age=mean(age),.groups='drop')
+  summarise(n=n(),mean0=mean(Hb,na.rm=TRUE),sd0=sd(Hb,na.rm=TRUE),deferred.perc=sum(deferred)/n(),
+            limit=min(limit),age=mean(age),.groups='drop')
 
 basics.all = simple %>% # simple
   filter(!is.na(Hb)) %>%
@@ -390,7 +457,6 @@ rownames(true.basics)=true.basics$Sex
 true.basics$comp=true.basics$z[c(2,1)]*true.basics$sd0+true.basics$mean.all
 
 true.basics$comp
-true.basics
 
 basics = basics %>%
   inner_join(true.basics[,c('Sex','mean.all')],join_by(Sex)) %>%
@@ -488,6 +554,8 @@ plotColBySex(basics,'dperc.lm','adjusted using estimated mean differences')
 ```
 
 ``` {r new-lm-approach}
+# This block relies on basics, so need to make sure it can be computed with the summary data
+# Plus must add countries
 par(mar=c(2,4,0,0))
 data=basics[basics$Sex=='Female',]
 data.female=data
