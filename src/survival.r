@@ -205,7 +205,7 @@ res.models=getResults(dlink,spec) # do.call(rbind,dcox.list)
 res.curves=getResults(dlink,spec.curves)
 
 # writing the results
-write.xlsx(list(res.models,res.curves),file=param$result.file,rowNames=FALSE)
+write.xlsx(list(models=res.models,curves=res.curves),file=param$result.file,rowNames=FALSE)
 
 ###
 # Below, some plots are drawn
