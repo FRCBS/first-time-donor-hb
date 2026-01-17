@@ -8,6 +8,8 @@ library(openxlsx)
 param=list()
 param$data.file = "c:/git_repot/DATA/donationdata.fortimo.rdata" # fi
 param$donation.types = c('Whole Blood (K)')
+
+# This has not yet been implemented
 param$max.sample.size=1e7 # This is still reasonably fast (< 1 min)
 param$hb.thold.male=135
 param$hb.thold.female=125
@@ -54,18 +56,12 @@ donation.simple = donationdata$donation[donationdata$donation$BloodDonationTypeK
 	inner_join(donationdata$donor[,c('numid','Sex','BloodGroup','DateOfBirth')],join_by(numid)) %>%
 	arrange(numid,DonationDate)
 
-# donation.simple$dtEnd = as.Date("2020-01-01") # nb! This is set to NA later
-# donation.simple$type = 'donation'
-# donation.simple$age= as.numeric(difftime(donation.simple$DonationDate,donation.simple$DateOfBirth),unit="weeks")/52.25
 donation.simple = donation.simple %>% 
 	group_by(numid) %>%
 	mutate(ord = row_number()) %>%
 	ungroup() %>%
-	# dplyr::select(-DateOfBirth) %>%
 	rename(date=DonationDate)
 
-str(donation.simple)
-str(donation0)
 donation0=donation.simple %>% filter(ord==1) %>% dplyr::select(numid,date) %>% rename(date0=date)
 donation.simple=donation.simple %>%
 	inner_join(donation0,join_by(numid))
@@ -84,9 +80,6 @@ donation.simple$ord.next=donation.simple$ord+1
 donation.simple$ord.prev=donation.simple$ord-1
 
 # Compute the running mean hb value
-# This might be useful in analysing optouts
-# In addition to the level, change, change wrt. the mean, distance from the threshold
-# Maybe unsuccessful donations should be included as well? somehow
 donation.simple = donation.simple %>%
 	mutate(trsum=cumsum(hb),.by=numid) %>%
 	mutate(hb.avg=trsum/ord) %>%
@@ -127,8 +120,6 @@ dlink$ord.group=dlink$ord
 dlink$ord.group[dlink$ord.group>ord.group.number]=ord.group.number+1
 dlink$ord.group=as.factor(dlink$ord.group)
 
-dlink$dummy=NULL
-
 do.coxph.inner = function(data0) {
 	hb.var=colnames(data0)[ncol(data0)]
 	data=data0[[hb.var]]
@@ -152,6 +143,11 @@ do.coxph.inner = function(data0) {
 		dplyr::select(-ord.group,-sex)
 
 	frml.char=paste0('Surv(diff,event)~.')
+
+	if (nrow(data0)>param$max.sample.size) {
+		wh.sample=sample(wh.sample,max.sample.size)
+		data0=data[wh.sample,]
+	}
 	m=coxph(formula(frml.char),data=data0)
 
 	if (ncol(data0)==2) {

@@ -21,7 +21,7 @@ if (grepl('^VP',Sys.info()[4])) {
 }
 
 getwd()
-source('analysis-functions.r')
+# source('analysis-functions.r')
 
 param$png.resolution=1.4*150
 param$figure.format='pdf'
