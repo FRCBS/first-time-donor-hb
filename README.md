@@ -3,7 +3,7 @@
 ### File to run
 
 The code necessary for extracting and exporting anonymised data can be found in
-[src/main-with-export.Rmd](src/main-with-export.Rmd).
+[src/export-data.r](src/export-data.r).
 
 ### Parameter settings
 
