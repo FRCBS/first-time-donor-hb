@@ -116,7 +116,8 @@ dlink = donation.simple %>%
 	dplyr::select(-ord.next,-ord.prev) %>%
 	mutate(hb.change=hb-hb.prev)
 
-dlink$hb.change[is.na(dlink$hb.change)]=0
+# dlink$hb.change[dlink$ord==1]=NA
+dlink$hb.change[is.na(dlink$hb.change)]=NA
 dlink$diff=as.integer(dlink$date.y-dlink$date.x)
 dlink$event=0
 dlink$event[!is.na(dlink$date.y)]=1
@@ -130,10 +131,21 @@ dlink$ord.group=as.factor(dlink$ord.group)
 dlink$dummy=NULL
 
 do.coxph.inner = function(data0) {
+bsAssign('data0')
 	hb.var=colnames(data0)[ncol(data0)]
+	sex0=data0$sex[1]
+
+	breaks.str='-'
+
 	data=data0[[hb.var]]
 	if (!is.factor(data) && length(unique(data)) > 10) {
-		data=cut(data,quantile(data,prob=c(0,0.1,0.25,0.75,0.9,1),names=FALSE,na.rm=TRUE))
+		breaks.ord=quantile(data,prob=c(0,0.1,0.25,0.75,0.9,1),names=FALSE,na.rm=TRUE)
+		print(breaks.ord)
+		breaks.str=df.breaks %>% filter(sex==sex0,var==hb.var) %>% dplyr::select(breaks) %>% as.character()
+		breaks.common=strsplit(breaks.str,',')[[1]]
+		print(paste('***',breaks.ord))
+		print(breaks.common)
+		data=cut(data,breaks.common)
 		levels(data)=c('bottom 10%','bottom 10-25%','mid','top 10-25%','top 10%')
 		data=relevel(data,ref='mid')
 	}
@@ -145,7 +157,6 @@ do.coxph.inner = function(data0) {
 			return(NULL)
 	}
 
-	sex0=data0$sex[1]
 	og0=data0$ord.group[1]
 
 	data0 = data0 %>%
@@ -164,12 +175,13 @@ do.coxph.inner = function(data0) {
 
 	var=sub('(.+)(top|bottom).+','\\1',rownames(df))
 	level=sub(hb.var,'',rownames(df))
-	df=cbind(var=hb.var,level=level,df)
-	colnames(df)=c('var','level','coef','exp.coef','se.coef','z','p.value')
+	df=cbind(var=hb.var,level=level,ord.group=og0,df)
+	colnames(df)=c('var','level','ord.group','coef','exp.coef','se.coef','z','p.value')
+	df$breaks=breaks.str
 
-	rdf=cbind(sex=sex0,ord.group=og0,df,sm$conf.int)
+	rdf=cbind(sex=sex0,df,sm$conf.int)
 	colnames(rdf)=sub(' \\.','..',colnames(rdf))
-	return(rdf[,-(1+ncol(rdf)-(3:4))])
+	return(rdf[,!grepl('\\(',colnames(rdf))])
 }
 
 bsAssign = function(name) {
@@ -181,11 +193,24 @@ bsAssign = function(name) {
 # Is it actually the case that the most active donors get their hb depleted
 # nb! This must be done 
 vars = c('avg.diff','hb.surplus','hb.change','age.group','bloodgr')
+hb.vars = c('avg.diff','hb.surplus','hb.change')
 spec=expand.grid(grp.var=c(NA,'sex'),hb.var=vars)
 cols.prefix=c('diff','event','sex','ord.group')
 
 spec=data.frame(hb.var=vars)
 spec.curves=data.frame(hb.var='-')
+
+# compute the breaks used to group hb-variables in the cox regressions
+res.breaks=lapply(hb.vars,function(x) {
+		min.x=min(dlink[!is.na(dlink[[x]]),'ord']) # 1 or 2
+		data.br=dlink[dlink$ord==min.x,c('sex',x)]
+		br.list=lapply(c('Male','Female'),function(y) {
+				brs=quantile(data.br[data.br$sex==y,x],prob=c(0,0.1,0.25,0.75,0.9,1),names=FALSE,na.rm=TRUE)
+				data.frame(var=x,sex=y,breaks=paste(brs,collapse=','))
+			})
+		do.call(rbind,br.list)
+	})
+df.breaks=do.call(rbind,res.breaks)
 
 getResults=function(dlink,spec) {
 	res=by(spec,spec,function(x) {
@@ -218,12 +243,23 @@ colours[['(25,40]']]='green3'
 colours[['(40,100]']]='gray3'
 colours[['O-']]='blue3'
 
+getIntervals = function(breaks) {
+	brs=strsplit(breaks,',')[[1]]
+	mid.bits=sapply(2:(length(brs)-2),function(x) paste0('(',brs[x],',',brs[x+1],']'))
+	lower=paste0('<',brs[2])
+	upper=paste0('>',brs[length(brs)-1])
+	return(c(lower,mid.bits[-2],upper))
+}
+
 pdf('results/figures.pdf')
 by(res.models,res.models[,c('sex','var')],function(y) {
 	plot(x=NULL,type='n',xlim=c(1,ord.group.number),ylim=c(0.70,1.40),main=paste(y$sex[1],y$var[1]),
 		xlab='number of donation',ylab='relative likelihood of donation')
 	abline(h=1,lwd=2,lty='dotted')
-	legend(x='bottomright',legend=unique(y$level),fill=sapply(unique(y$level),function(x) colours[[x]]))
+	breaks=y$breaks[1]
+	brk.labels=if (breaks!='-') getIntervals(breaks) else ''
+	levels=unique(y$level)
+	legend(x='bottomright',legend=paste(levels,brk.labels),fill=sapply(levels,function(x) colours[[x]]))
 	by(y,y[,c('var','level')],function(x) {
 			gr=x$level[1]
 			col=colours[[gr]]
