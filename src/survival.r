@@ -232,7 +232,7 @@ res.curves=getResults(dlink,spec.curves)
 # writing the results
 write.xlsx(list(models=res.models,curves=res.curves),file=param$result.file,rowNames=FALSE)
 
-###
+#####
 # Below, some plots are drawn
 colours=list()
 colours[['top 10%']]='blue3'
@@ -253,7 +253,7 @@ getIntervals = function(breaks) {
 
 pdf('results/figures.pdf')
 by(res.models,res.models[,c('sex','var')],function(y) {
-	plot(x=NULL,type='n',xlim=c(1,ord.group.number),ylim=c(0.70,1.40),main=paste(y$sex[1],y$var[1]),
+	plot(x=NULL,type='n',xlim=c(1,max(y$ord)),ylim=c(0.70,1.40),main=paste(y$sex[1],y$var[1]),
 		xlab='number of donation',ylab='relative likelihood of donation')
 	abline(h=1,lwd=2,lty='dotted')
 	breaks=y$breaks[1]
@@ -263,7 +263,7 @@ by(res.models,res.models[,c('sex','var')],function(y) {
 	by(y,y[,c('var','level')],function(x) {
 			gr=x$level[1]
 			col=colours[[gr]]
-			ordint=as.integer(x$ord.group)
+			ordint=x$ord
 			lines(ordint,x$exp.coef,lwd=2,col=col)
 			lines(ordint,x$lower..95,lwd=2,lty='dotted',col=col)
 			lines(ordint,x$upper..95,lwd=2,lty='dotted',col=col)
@@ -272,7 +272,7 @@ by(res.models,res.models[,c('sex','var')],function(y) {
 dev.off()
 
 pdf('results/curves.pdf')
-dummy=by(res.curves,res.curves[,c('sex','ord.group')],function(df) {
+dummy=by(res.curves,res.curves[,c('sex','ord')],function(df) {
 bsAssign('df')
 		wh=min(which(df$surv<0.99))
 		len0=length(df$surv)
@@ -292,22 +292,23 @@ bsAssign('df')
 		lines(df$time,pred.ss,col='red2',lwd=2.5)
 
 		tv=qt(0.025,df=sm$df[2])
-		return(data.frame(sex=df$sex[1],ord.group=df$ord.group[1],var=rownames(sm$coeff),sm$coeff,lower=sm$coeff[,1]-tv*sm$coeff[,2],upper=sm$coeff[,1]+tv*sm$coeff[,2]))
+		return(data.frame(sex=df$sex[1],ord=df$ord[1],var=rownames(sm$coeff),sm$coeff,lower=sm$coeff[,1]-tv*sm$coeff[,2],upper=sm$coeff[,1]+tv*sm$coeff[,2]))
 	})
 dev.off()
 
 ce=do.call(rbind,dummy)
-
+str(ce)
 
 # nb! should use the similar implementation in the previous project to enable easier and more parametric
 # plotting with countries etc.
-plotParameters = function(ce,xvar='log_alpha',yvar='yf',col.var='sex',pp.cols=list(Male='blue3',Female='red3'),shade.var='ord.group') {
+plotParameters = function(ce,xvar='log_alpha',yvar='yf',col.var='sex',pp.cols=list(Male='blue3',Female='red3'),shade.var='ord') {
 	lims = ce %>% 
 		group_by(var) %>%
 		summarise(min=min(Estimate),max=max(Estimate)) %>%
 		data.frame()
 	rownames(lims)=lims$var
 	lims$var=NULL
+
 	# plot(x=NULL,xlim=c(-3,-1),ylim=c(0,0.33),xlab='exponent',ylab='asymptote')
 	plot(x=NULL,xlim=t(lims[xvar,]),ylim=t(lims[yvar,]),xlab='exponent',ylab='asymptote')
 	for (gr in names(pp.cols)) {
@@ -320,7 +321,7 @@ plotParameters = function(ce,xvar='log_alpha',yvar='yf',col.var='sex',pp.cols=li
 
 		shades=colorRampPalette(c(pp.cols[[gr]],"white"))(5+nrow(xdata))
 
-		col0=col=shades[as.integer(xdata$ord.group)]
+		col0=col=shades[xdata$ord]
 		points(xdata$Estimate,ydata$Estimate,col=col0,lwd=3,pch=10)
 		lines(xdata$Estimate,ydata$Estimate,col=col0,lwd=1,lty='dashed')
 
