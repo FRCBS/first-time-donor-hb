@@ -71,7 +71,7 @@ plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c(
 	# bsAssign('lgnd')
 	# legend=paste(lgnd)
 	legend.data=do.call(rbind,lgnd)
-	legend(x='bottom',legend=legend.data$text,col=legend.data$col,lty=legend.data$lty,lwd=2)
+	legend(x='bottom',legend=sub('cm','corrected',legend.data$text),col=legend.data$col,lty=legend.data$lty,lwd=2)
 }
 
 countries = list()
@@ -321,7 +321,10 @@ plotByGroups(hb.dummy,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),co
 hb.cmp=inner_join(crtn.annual,hb.dummy,join_by(data.set,sex,country,year,)) %>%
 	mutate(hb=hb+correction,country='cm') %>%
 	select(!!!syms(colnames(hb.dummy))) %>%
-	rbind(hb.dummy)
+	rbind(hb.dummy) %>%
+	dplyr::filter(year>=2002,year<2024)
+
+table(hb.cmp$year)
 
 pdf('../results/trends-corrected.pdf')
 plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=list(Male='blue3',Female='red3'),ltys=list(cm='dashed',fi='solid'))

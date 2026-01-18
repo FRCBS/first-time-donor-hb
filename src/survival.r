@@ -7,10 +7,10 @@ library(openxlsx)
 
 param=list()
 param$data.file = "c:/git_repot/DATA/donationdata.fortimo.rdata" # fi
-param$donation.types = c('Whole Blood (K)')
+param$donation.type.keys = c('Whole Blood (K)')
 param$max.sample.size=1e7 # This is still reasonably fast (< 1 min)
-param$hb.thold.male=135
-param$hb.thold.female=125
+param$cutoff.male=135
+param$cutoff.female=125
 param$max.ord.group.number=15
 
 param$omit.data=list()
@@ -34,6 +34,7 @@ param$result.file = file.path(param$wd,"results","exported-survival-data.xlsx")
 if (!exists('donationdata'))
 	load(param$data.file)
 
+####
 charid=unique(donationdata$donor$releaseID)
 id.map = data.frame(charid=charid,numid=1:length(charid))
 rownames(id.map)=id.map$charid
@@ -50,7 +51,7 @@ for (nm in names(param$omit.data)) {
 		filter(as.character(!!!syms(nm))!=param$omit.data[[nm]])
 }
 
-donation.simple = donationdata$donation[donationdata$donation$BloodDonationTypeKey %in% param$donation.types,c('rowid','numid','DonationDate','Hb')] %>% 
+donation.simple = donationdata$donation[donationdata$donation$BloodDonationTypeKey %in% param$donation.type.keys,c('rowid','numid','DonationDate','Hb')] %>% 
 	inner_join(donationdata$donor[,c('numid','Sex','BloodGroup','DateOfBirth')],join_by(numid)) %>%
 	arrange(numid,DonationDate)
 
@@ -96,8 +97,8 @@ donation.simple = donation.simple %>%
 	mutate(avg.before=(hb.avg*ord-hb)/(ord-1)) %>%
 	mutate(avg.diff=hb-avg.before)
 
-donation.simple$hb.thold=param$hb.thold.female
-donation.simple$hb.thold[donation.simple$sex=='Male']=param$hb.thold.male
+donation.simple$hb.thold=param$cutoff.female
+donation.simple$hb.thold[donation.simple$sex=='Male']=param$cutoff.male
 donation.simple$hb.surplus=donation.simple$hb-donation.simple$hb.thold
 
 repeat.counts = donation.simple %>%
