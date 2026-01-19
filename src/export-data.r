@@ -29,6 +29,8 @@ param$result.file = file.path(param$wd,"results","exported-data.xlsx")
 param$country = 'FI'
 
 param$omit.data=list()
+param$max.ord.group.number=15
+param$max.sample.size=1e7 # This is still reasonably fast (< 1 min)
 
 param$include.na = TRUE
 param$minimum.group.size = 5
@@ -57,6 +59,8 @@ param$donation.cols = c()
 # nb! In order to extract hourly data, this function should be redefined as a
 # country-specific parameter
 param$extractHour = function(simple) {return(0)} 
+
+param$omit.data=list()
 
 # Country-specific parameter settings
 if (param$country == 'NL') {
@@ -90,6 +94,8 @@ if (param$country == 'NL') {
   }
   param$donor.cols = c('DateOfBirth','Sex','BloodGroup')
   param$donation.cols = c('DonationTimeDTTM')
+
+  param$omit.data$DonationPlaceType='Garrison'
 
   # For Finland, omit the donations from garrisons to create a second version of the data set
   param$omit.data$DonationPlaceType='Garrison'
@@ -125,7 +131,18 @@ if (is.na(param$hb.decimals)) {
 # https://github.com/FRCBS/donor-recruitment-prediction/
 # except for the column 'Hb' added in the donation table. The units used in Finland is g/l.
 # nb! If donationdata is already available in memory, this chunk/the following line need not be run.
-load(param$data.file)
+if (!exists('donationdata'))
+	load(param$data.file)
+
+charid=unique(donationdata$donor$releaseID)
+id.map = data.frame(charid=charid,numid=1:length(charid))
+rownames(id.map)=id.map$charid
+
+donationdata$donation$numid=id.map[donationdata$donation$releaseID,'numid']
+donationdata$donor$numid=id.map[donationdata$donor$releaseID,'numid']
+
+donationdata$donation$rowid=1e7+1:nrow(donationdata$donation) #as.integer(rownames(donationdata$donation))
+donationdata$donor$rowid=2e5+1:nrow(donationdata$donor) # as.integer(rownames(donationdata$donor))
 
 donationdata$donation$DonationPlaceType[is.na(donationdata$donation$DonationPlaceType)]='Office'
 for (nm in names(param$omit.data)) {
@@ -136,8 +153,6 @@ for (nm in names(param$omit.data)) {
 ## ----load-and-process-data--------------------------------------------------------------------------------------------------------------------------------------------------------------
 if (is.null(param$donation.type.keys)) 
   param$donation.type.keys = unique(donationdata$donation$BloodDonationTypeKey)
-
-
 
 simple = donationdata$donation[, c("releaseID", "BloodDonationTypeKey", "DonationDate", 
                   "DonationPlaceType", "DonationPlaceCode", "Hb", param$donation.cols)] %>%
@@ -284,473 +299,218 @@ write.xlsx(list(parameters=data.frame(name=names(param),value=paste(param,sep=',
                 annual.hb=hb.freq,annual.age=age.freq,montly.statistics=monthly,hourly.statistics=hourly),
            file=param$result.file)
 
-# Remove the placeholder values for very small and very large Hb values and NA's
-hb.freq = hb.freq[abs(hb.freq$Hb) < 1000 & !is.na(hb.freq$Hb),]
+#####################
+# export survival data
 
+# nb! This leads to smoother results, although not sure if it is justified
+# dim(dlink) 
+# [1] 6516688      23 # the not-so-smooth case
+# [1] 5955572      24 # the smooth case
+param$donation.type.keys=c("Whole Blood (K)")
 
-## ----function-definitions---------------------------------------------------------------------------------------------------------------------------------------------------------------
-plotColBySex = function(basics,col,ylab,xvar='year') {
-  sex.col = data.frame(sex=c('Female','Male'),col=c('red','blue'))
-  rownames(sex.col)=sex.col$sex
-  
-  par(mar=c(2,4,0,4))
-  plot.cols=c(col)
-  plot(basics[[xvar]],basics[[plot.cols[1]]],type='n',ylab=ylab)
-  for (i in 1:nrow(sex.col)) {
-    data1 = basics[basics$Sex==sex.col$sex[i],]
-    for (col in plot.cols) {
-      lines(data1[[xvar]],data1[[col]],col=sex.col$col[i],lwd=2)
-      
-      for (suf in c('low','hi')) {
-        ci.var = paste0(col,'.',suf)
-        if (ci.var %in% names(basics)) {
-          lines(data1[[xvar]],data1[[ci.var]],lty='dotted',lwd=1,col=sex.col$col[i])
-        }
-      }
-      
-      frml=paste0(col,'~',xvar)
-      m=lm(formula(frml),data=data1)
-      sm=summary(m)
-      abline(a=sm$coeff[1,1],b=sm$coeff[2,1],col=sex.col$col[i],lty='dashed',lwd=2)
-      text(x=min(data1[[xvar]]),y=min(data1[[col]])+0.01,
-           labels=paste0('b=',round(100*sm$coeff[2,1],5),'%,p=',round(sm$coeff[2,4],3)),adj=c(0))
-    }
-  }
+charid=unique(donationdata$donor$releaseID)
+id.map = data.frame(charid=charid,numid=1:length(charid))
+rownames(id.map)=id.map$charid
+
+donationdata$donation$numid=id.map[donationdata$donation$releaseID,'numid']
+donationdata$donor$numid=id.map[donationdata$donor$releaseID,'numid']
+
+donationdata$donation$rowid=1e7+1:nrow(donationdata$donation) #as.integer(rownames(donationdata$donation))
+donationdata$donor$rowid=2e5+1:nrow(donationdata$donor) # as.integer(rownames(donationdata$donor))
+
+donationdata$donation$DonationPlaceType[is.na(donationdata$donation$DonationPlaceType)]='Office'
+for (nm in names(param$omit.data)) {
+	donationdata$donation=donationdata$donation %>%
+		filter(as.character(!!!syms(nm))!=param$omit.data[[nm]])
 }
 
-# Some of these function definitions may be obsolete, should check and remove the unnecessary ones.
-plotHbDist = function(data0,sex,cutoff,zoom=TRUE) {
-  sex0=data0[data0$year>=2005&data0$Sex==sex & 
-              !is.na(data0$Hb)&data0$BloodDonationTypeKey %in% c('Whole Blood (K)','No Donation (E)'),c('Hb')]  
-  freq = sex0 %>%
-    group_by(Hb) %>%
-    summarise(n=n()) %>%
-    mutate(prop=n/sum(n))
+# donation.simple = donationdata$donation[donationdata$donation$BloodDonationTypeKey %in% param$donation.type.keys,c('rowid','numid','DonationDate','Hb')] %>% 
+#	inner_join(donationdata$donor[,c('numid','Sex','BloodGroup','DateOfBirth')],join_by(numid)) %>%
+#	arrange(numid,DonationDate)
 
-  limits = NULL
-  if (zoom)
-    limits = c(cutoff-5,cutoff+5)
-  plot(prop~Hb,data=freq,type='l',lwd=2,xlim=limits)
+# new variant adapted from the new export-data.file
+donation.simple = donationdata$donation[, c('rowid','numid',"BloodDonationTypeKey", "DonationDate", 
+                  "Hb", param$donation.cols)] %>% #  "DonationPlaceType","DonationPlaceCode"
+  filter(param$include.na || !is.na(Hb)) %>%
+  filter(BloodDonationTypeKey %in% param$donation.type.keys) %>%
+  # VisitNoDonation is used in Finland during the recent years instead of No Donation (E)
+  left_join(donationdata$donor[,c('numid',param$donor.cols)],join_by(numid)) %>%
+  arrange(numid,DonationDate) %>%
+  dplyr::select(-BloodDonationTypeKey)
 
-  mean0=mean(sex0$Hb)
-  sd0=sd(sex0$Hb)
-  
-  text(x=cutoff,y=0.03,labels=paste0('mean=',mean0,', sd=',sd0))
-  
-  ndist=dnorm(unique(freq$Hb),mean=mean0,sd=sd0)
-  lines(unique(freq$Hb),ndist)
-  abline(v=cutoff,col='blue')
-  
-  return(list(mean0=mean0,sd0=sd0))
+donation.simple = donation.simple %>% 
+	group_by(numid) %>%
+	mutate(ord = row_number()) %>%
+	ungroup() %>%
+	rename(date=DonationDate)
+
+donation0=donation.simple %>% filter(ord==1) %>% dplyr::select(numid,date) %>% rename(date0=date)
+donation.simple=donation.simple %>%
+	inner_join(donation0,join_by(numid))
+
+# colnames(donation.simple)=c('rowid','numid','date','hb','sex','bloodgroup','dateofbirth','ord','date0')
+colnames(donation.simple)=tolower(colnames(donation.simple))
+
+donation.simple$bloodgr='other'
+donation.simple$bloodgr[donation.simple$bloodgroup=='O-']='O-'
+donation.simple$bloodgr=as.factor(donation.simple$bloodgr)
+donation.simple$bloodgr=relevel(donation.simple$bloodgr,ref='other')
+
+donation.simple$age=as.numeric(difftime(donation.simple$date0,donation.simple$dateofbirth),unit="weeks")/52.25
+donation.simple$age.group=cut(donation.simple$age,breaks=c(0,25,40,100))
+
+donation.simple$ord.next=donation.simple$ord+1
+donation.simple$ord.prev=donation.simple$ord-1
+
+# Compute the running mean hb value
+# This might be useful in analysing optouts
+# In addition to the level, change, change wrt. the mean, distance from the threshold
+# Maybe unsuccessful donations should be included as well? somehow
+donation.simple = donation.simple %>%
+	mutate(trsum=cumsum(hb),.by=numid) %>%
+	mutate(hb.avg=trsum/ord) %>%
+	dplyr::select(-trsum)
+
+donation.simple = donation.simple %>% 
+	mutate(avg.before=(hb.avg*ord-hb)/(ord-1)) %>%
+	mutate(avg.diff=hb-avg.before)
+
+donation.simple$hb.thold=param$cutoff.female
+donation.simple$hb.thold[donation.simple$sex=='Male']=param$cutoff.male
+donation.simple$hb.surplus=donation.simple$hb-donation.simple$hb.thold
+
+repeat.counts = donation.simple %>%
+	group_by(ord) %>%
+	summarise(n=n(),.groups='drop') %>%
+	mutate(rownr=row_number()) %>%
+	filter(ord==rownr,n>100) %>%
+	data.frame()
+
+#####
+dt.max=max(donation.simple$date)
+
+dlink = donation.simple %>%
+	left_join(donation.simple[,c('numid','ord','date')],join_by(numid,x$ord.next==y$ord)) %>%
+	left_join(donation.simple[,c('numid','ord','hb')],join_by(numid,x$ord.prev==y$ord),suffix=c('','.prev')) %>%
+	dplyr::select(-ord.next,-ord.prev) %>%
+	mutate(hb.change=hb-hb.prev)
+
+# dlink$hb.change[dlink$ord==1]=NA
+dlink$hb.change[is.na(dlink$hb.change)]=NA
+dlink$diff=as.integer(dlink$date.y-dlink$date.x)
+dlink$event=0
+dlink$event[!is.na(dlink$date.y)]=1
+dlink$diff[is.na(dlink$diff)]=as.integer(dt.max-dlink$date.x[is.na(dlink$diff)])
+
+ord.group.number=min(nrow(repeat.counts),param$max.ord.group.number)
+dlink$ord.group=dlink$ord
+dlink$ord.group[dlink$ord.group>ord.group.number]=ord.group.number+1
+dlink$ord.group=as.factor(dlink$ord.group)
+
+dlink$dummy=NULL
+
+do.coxph.inner = function(data0) {
+bsAssign('data0')
+	hb.var=colnames(data0)[ncol(data0)]
+	sex0=data0$sex[1]
+
+	breaks.str='-'
+
+	data=data0[[hb.var]]
+	if (!is.factor(data) && length(unique(data)) > 10) {
+		breaks.ord=quantile(data,prob=c(0,0.1,0.25,0.75,0.9,1),names=FALSE,na.rm=TRUE)
+		# print(breaks.ord)
+		breaks.str=df.breaks %>% filter(sex==sex0,var==hb.var) %>% dplyr::select(breaks) %>% as.character()
+		breaks.common=strsplit(breaks.str,',')[[1]]
+		# print(paste('***',breaks.ord))
+		# print(breaks.common)
+		data=cut(data,breaks.common)
+		levels(data)=c('bottom 10%','bottom 10-25%','mid','top 10-25%','top 10%')
+		data=relevel(data,ref='mid')
+	}
+
+	data0[[ncol(data0)]]=data
+
+	if (all(is.na(data0[[hb.var]])) || length(unique(data0[[hb.var]])) == 1) {
+		if (!hb.var %in% c('ord.group','sex'))
+			return(NULL)
+	}
+
+	og0=data0$ord.group[1]
+
+	data0 = data0 %>%
+		dplyr::select(-ord.group,-sex)
+
+	frml.char=paste0('Surv(diff,event)~.')
+	m=coxph(formula(frml.char),data=data0)
+
+	if (ncol(data0)==2) {
+		# The case where survfit are extracted; spec ~ '-'. Will just return the survival curves
+		return(with(survfit(m),data.frame(sex=sex0,ord.group=og0,n,time,n.risk,n.event,n.censor,surv,cumhaz,std.err,std.chaz,lower,upper)))
+	}
+
+	sm=summary(m)
+	df=data.frame(sm$coeff)
+
+	var=sub('(.+)(top|bottom).+','\\1',rownames(df))
+	level=sub(hb.var,'',rownames(df))
+	df=cbind(var=hb.var,level=level,ord.group=og0,df)
+	colnames(df)=c('var','level','ord.group','coef','exp.coef','se.coef','z','p.value')
+	df$breaks=breaks.str
+
+	rdf=cbind(sex=sex0,df,sm$conf.int)
+	colnames(rdf)=sub(' \\.','..',colnames(rdf))
+	return(rdf[,!grepl('\\(',colnames(rdf))])
 }
 
-estimateTrend = function(final) {
-  final.longer = matToLonger(final)
-  final.longer$interceptFemale=1
-  final.longer$interceptFemale[final.longer$Sex=='Male']=0
-  final.longer$interceptMale=1-final.longer$interceptFemale
-  m=lm(value~0+interceptFemale+interceptMale+year:Sex,data=final.longer)
-  print(summary(m))
-  return(m)
+bsAssign = function(name) {
+	obj = get(name,envir=parent.frame())
+	assign(name,obj,.GlobalEnv)
 }
 
-matToLonger = function(mat) {
-  df1=as.data.frame(pivot_longer(cbind(Sex=rownames(mat)[1:2],mat[1:2,]),colnames(mat),names_to='year'))
-  df1$year=as.integer(df1$year)
-  return(df1)
+# interesting results: those with 'more hb tend to donate less frequently
+# Is it actually the case that the most active donors get their hb depleted
+# nb! This must be done 
+vars = c('avg.diff','hb.surplus','hb.change','age.group','bloodgr')
+hb.vars = c('avg.diff','hb.surplus','hb.change')
+spec=expand.grid(grp.var=c(NA,'sex'),hb.var=vars)
+cols.prefix=c('diff','event','sex','ord.group')
+
+spec=data.frame(hb.var=vars)
+spec.curves=data.frame(hb.var='-')
+
+# compute the breaks used to group hb-variables in the cox regressions
+res.breaks=lapply(hb.vars,function(x) {
+		min.x=min(dlink[!is.na(dlink[[x]]),'ord']) # 1 or 2
+		data.br=dlink[dlink$ord==min.x,c('sex',x)]
+		br.list=lapply(c('Male','Female'),function(y) {
+				brs=quantile(data.br[data.br$sex==y,x],prob=c(0,0.1,0.25,0.75,0.9,1),names=FALSE,na.rm=TRUE)
+				data.frame(var=x,sex=y,breaks=paste(brs,collapse=','))
+			})
+		do.call(rbind,br.list)
+	})
+df.breaks=do.call(rbind,res.breaks)
+
+getResults=function(dlink,spec) {
+	res=by(spec,spec,function(x) {
+		if (x=='-') {
+			x=NULL
+		} else
+			x=c(t(x))
+		
+		coeff.list=by(dlink[,c(cols.prefix,x)],dlink[,c('sex','ord.group')],do.coxph.inner)
+		res=do.call(rbind,coeff.list)
+		return(res)
+	})
+	return(do.call(rbind,res))
 }
 
-# This function is in active use, but it doesn't seem to refer the functions above
-plotYearSex = function(m,relative=FALSE) {
-  cofs = summary(m)$coeff
-  conames=rownames(cofs)
-  codf=data.frame(name=conames,estimate=cofs[,1])
-  wh=grep('(Male|Female)',conames)
-  codf$Sex[wh]=sub('.*(Male|Female).*','\\1',conames[wh])
-  wh=grep('[0-9][0-9][0-9][0-9]',conames)
-  codf$year[wh]=sub('[^0-9]+([0-9]+).*','\\1',conames[wh])
-  codf=cbind(codf,confint(m))
-  
-  codf=codf[!is.na(codf$year),]
-  pah=pivot_wider(codf,names_from='year',values_from='estimate',id_cols=c('Sex'))
-  rn = as.vector(pah[,1])
-  pah=as.data.frame(pah[,-1])
-  rownames(pah)=rn$Sex
-  
-  means=apply(pah,1,mean)
-  if (!relative)
-    means=0*means
-  
-  pah=pah-means
-  
-  pah2=pivot_wider(codf,names_from='year',values_from='2.5 %',id_cols=c('Sex'))
-  pah2=as.data.frame(pah2[,-1])
-  pah2=pah2-means
-  pah3=pivot_wider(codf,names_from='year',values_from='97.5 %',id_cols=c('Sex'))
-  pah3=as.data.frame(pah3[,-1])
-  pah3=pah3-means
-  
-  pah.all=rbind(pah,pah2,pah3)
-  
-  matplot(t(pah.all),type='l',lty=c(rep('solid',2),rep('dashed',4)),col=rep(c('red','blue'),2),axes=FALSE)
-  axis(2)
-  axis(side=1,at=1:ncol(pah.all),labels=colnames(pah.all))
-  return(pah.all)
-}
+res.models=getResults(dlink,spec) # do.call(rbind,dcox.list)
+res.curves=getResults(dlink,spec.curves)
 
+res.models$ord=(as.integer(res.models$ord.group))
+res.curves$ord=(as.integer(res.curves$ord.group))
 
-## ----distribution-analysis--------------------------------------------------------------------------------------------------------------------------------------------------------------
-# This is the function that correct the kink in a distriution (data0)
-# The function can be either called with data0 != NULL; data0 should then have the structure of simple, donation0 or donation.r
-#   and can be a subset of these.
-# *or* with freq != NULL, with the structure of hb.freq
-# Nb! This function operates on a single distribution
-rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL) {
-  if (is.null(cutoff)) {
-    if (is.null(sex)) {
-      if (is.null(data0)) {
-        sex = unique(freq$Sex)[1]
-      } else
-        sex = unique(data0$Sex)[1]
-    } 
-    cutoff = if (sex=='Female') param$cutoff.female else param$cutoff.male
-  }
-
-  if (!is.null(data0)) {
-    # sex0=data0[data0$Sex==sex&!is.na(data0$Hb)&data0$BloodDonationTypeKey %in% c('Whole Blood (K)','No Donation (E)'),c('Hb')]  
-    freq = data0 %>%
-      group_by(Hb) %>%
-      summarise(n=n()) %>%
-      mutate(prop=n/sum(n))
-  } else {
-    freq = freq %>%
-      group_by(Hb) %>%
-      summarise(n=sum(n),.groups='drop')
-  }
-  
-  freq = freq[!is.na(freq$Hb),]
-  
-  if (!'prop' %in% colnames(freq)) {
-    sum.n = sum(freq$n) # -coalesce(freq$nas,0))
-    freq$prop = freq$n / sum.n
-  }
-  
-  freq.mean = freq %>%
-    filter(!is.na(Hb)) %>% # These are the summary rows for NA; leave them out at this point
-    summarise(n2=sum(n),mean0=sum(Hb*(n))/n2,.groups='drop')
-  
-  freq.stats = freq %>%
-    filter(!is.na(Hb)) %>% # These are the summary rows for NA; leave them out at this point
-    mutate(dev=Hb-freq.mean$mean0) %>% # ,prop=n/n2) %>%
-    group_by() %>%
-    summarise(mean=min(freq.mean$mean0),n0=min(n),var=sum(prop*dev^2),sd=sqrt(var),
-              skewness=sum(prop*(dev/sd)^3),kurtosis=sum(prop*(dev/sd)^4),.groups='drop')
-  mean0= freq.stats$mean
-  sd0 = freq.stats$sd
-
-  Hb.values = sort(unique(freq$Hb))
-  if (FALSE) {
-    dx <- 1. #depends on units, but should now all be converted to g/L
-  } else  {
-    if (param$hb.decimals == 1){
-      dx <- 0.1 #depends on units, but should now all be converted to g/L
-    } else{
-      dx = 1.
-    }
-  }
-  ndist=dnorm(Hb.values,mean=mean0,sd=sd0)*dx
-  
-  # Plotting the unchanged distribution
-  if (plot) {
-    plot(prop~Hb,data=freq,type='l',lwd=2)
-    lines(Hb.values,ndist)
-  
-    # A plot showing the difference between the distribution defined by data0 and the
-    # normal distribution estimated from that data
-    plot(freq$prop-ndist~Hb.values)
-    abline(v=cutoff,col='blue')
-    abline(h=c(-1,1)*0.0005,col='red')
-  }
-
-  # This is the part that 
-  cnt = 0
-  freq2 = freq
-  # cover the case that there is no data at the cutoff value (should not occur with reasonable data volumes)
-  # k = which(freq$Hb==cutoff)
-  k = max(which(freq$Hb<=cutoff))
-  if (length(k) == 0 || k == -Inf) 
-    k = min(which(freq$Hb>=cutoff))
-  while (TRUE) {
-    diff = (freq2$prop-ndist)[1:(k-1)]
-    wh = which(diff < -0.0005)
-    if (length(wh) == 0)
-      break
-    wh0 = max(wh)
-    ds0 = diff[wh0]
-    
-    diff.plus = (freq2$prop-ndist)[k:nrow(freq2)]
-    wh = which(diff.plus > 0.0005)
-    if (length(wh) == 0)
-      break
-    wh1 = min(wh)
-    ds1 = diff.plus[wh1]
-    
-    to.adjust = min(-ds0,ds1)
-    
-    freq2$prop[wh0] = freq2$prop[wh0] + to.adjust
-    freq2$prop[wh1+(k-1)] = freq2$prop[wh1+(k-1)] - to.adjust
-    
-    cnt = cnt + 1
-    if (cnt > 1000) {
-      print('max iterations exceeded (back-stop)')
-      break
-    }
-  }
-
-  mean1 = freq2 %>% 
-      mutate(mom=Hb*prop) %>%
-      summarise(mean=sum(mom))
-  mean1=as.numeric(mean1)
-  sd1 =  freq2 %>% 
-      mutate(mom=(Hb-as.numeric(mean1))^2*prop) %>%
-      summarise(sdx=sum(mom)) 
-  sd1=sqrt(as.numeric(sd1))
-  
-  # The theoretical deferred proportion is computed here
-  deferred.prop = pnorm(cutoff-0.5,mean1,sd1)
-
-  if (plot) {
-    plot(prop~Hb,data=freq2,type='l',lwd=3,xlim=NULL)
-    lines(prop~Hb,data=freq2,col='green', lwd=2)
-    ndist2=dnorm(Hb.values,mean=mean1,sd=sd1)*dx
-    lines(Hb.values,ndist2,col='red',lty='dotted',lwd=2)
-    abline(v=cutoff,col='blue',lty='dashed')
-    rect(mean1-5,0,mean1+5,0.001,col='pink',lwd=2)
-    abline(v=mean1,lty='dotted',lwd=3)
-    
-    plot(freq2$prop-ndist2~Hb.values)
-    abline(v=cutoff,col='blue',lty='dashed')
-    abline(h=c(-1,1)*0.0005,col='red',lty='dashed')
-  }
-
-  return(list(dist=freq2,params=list(mean=mean1,sd=sd1,deferred.prop=deferred.prop)))
-}
-
-
-## ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-# Example of rectifying the distribution
-freq <- hb.freq[hb.freq$Sex=='Female', ]
-rectifyDistribution(NULL,'Female',param$cutoff.female,freq=freq)
-# dist.male = rectifyDistribution(simple,'Male',cutoff)
-# dist.female = rectifyDistribution(simple,'Female',cutoff)
-
-
-## ----getStats-function------------------------------------------------------------------------------------------------------------------------------------------------------------------
-# This function produces statistics of value.col (Hb or age) based on groups defined by group.col (can be year or age) and sex
-# If age.freq is provided, the proportions are included in the results (relevant when value.col == 'Hb')
-getStats = function(freq,value.col='Hb',group.col='year',n.filter=100,age.freq=NULL,age.breaks=c(-Inf,24,40,Inf),age.labels=c('young','mid','old')) {
-  freq = data.frame(freq)
-  
-  if (is.null(n.filter) || is.na(n.filter))
-    n.filter = 0
-  
-  wh = min(which(colnames(freq)==value.col))
-  colnames(freq)[wh]='value'
-  wh.group = min(which(colnames(freq)==group.col))
-  colnames(freq)[wh.group]='group'
-
-  new.basics.mean = freq %>%
-    # filter(is.null(data.set) || data.set==data.set) %>%
-    filter(!is.na(value)) %>% # These are the summary rows for NA; leave them out at this point
-    group_by(group,Sex) %>%
-    summarise(n2=sum(n-nas),deferred.prop=sum(deferred/n2),mean0=sum(value*(n-nas))/n2,.groups='drop')
-  
-  new.basics = freq %>%
-    filter(!is.na(value)) %>% # These are the summary rows for NA; leave them out at this point
-    inner_join(new.basics.mean,join_by(group,Sex)) %>%
-    mutate(dev=value-mean0,prop=n/n2) %>%
-    group_by(group,Sex) %>%
-    summarise(mean=min(mean0),n0=min(n),n=min(n2),deferred.prop=min(deferred.prop),var=sum(prop*dev^2),sd=sqrt(var),
-              skewness=sum(prop*(dev/sd)^3),kurtosis=sum(prop*(dev/sd)^4),.groups='drop') %>%
-    mutate(sd.low=sqrt((n-1)*var/qchisq(c(.975), n-1))) %>%
-    mutate(sd.hi =sqrt((n-1)*var/qchisq(c(.0275), n-1))) %>%
-    mutate(mean.low=mean-qnorm(0.025)*sd/sqrt(n)) %>%
-    mutate(mean.hi =mean-qnorm(0.975)*sd/sqrt(n)) %>%
-    filter(n>n.filter) %>%
-    data.frame()
-  
-  wh.group = min(which(colnames(new.basics)=='group'))
-  colnames(new.basics)[wh.group]=group.col
-  
-  if (value.col=='Hb') {
-    freq.limits = freq %>% group_by(group,Sex) %>% summarise(limit=min(limit),.groups='drop') %>% mutate(year=group)
-    new.basics = new.basics %>%
-      inner_join(freq.limits,join_by(year,Sex)) %>%
-      mutate(theoretical.deferred.prop = pnorm(limit,mean,sd)) %>%
-      dplyr::select(-limit)
-  }
-  
-  if (!is.null(age.freq)) {
-    year.totals = age.freq %>%
-      group_by(year,Sex) %>%
-      summarise(n2=sum(n),age=mean(age),.groups='drop')
-    
-    age2 = age.freq %>%
-      mutate(group = cut(age,age.breaks,labels=age.labels)) %>%
-      group_by(year,Sex,group) %>%
-      summarise(n=sum(n),.groups='drop') %>%
-      inner_join(year.totals,join_by(year,Sex)) %>%
-      mutate(prop=n/n2) %>% # ,name=paste(year,Sex)) %>%
-      pivot_wider(id_cols=c('year','Sex'),names_from='group',values_from='prop')
-
-
-    new.basics = new.basics %>%
-      inner_join(age2,join_by(year,Sex)) %>%
-      inner_join(year.totals[,c('year','Sex','age')],join_by(year,Sex))
-  }
-
-  
-  return(new.basics)
-}
-
-
-## ----county-specific-basics-------------------------------------------------------------------------------------------------------------------------------------------------------------
-getCountryBasics = function(hb.freq,age.freq,cf=1) {
-  # hb.freq = data$hb.freq; age.freq=data$age.freq
-  freq0=hb.freq[hb.freq$data.set=='donation0',]
-  age0 = age.freq[age.freq$data.set=='donation0',]
-  rv=by(freq0,freq0[,c('Sex','year')],function(x) unlist(rectifyDistribution(data0=NULL,freq=x,plot=FALSE)$params))
-  res=array2DF(rv)
-  res$year=as.integer(res$year)
-  
-  # Basic statistics for the unrectified hb distributions
-  basics.all = getStats(freq0,age.freq = age0)
-  
-  # Basic statistics joined with results from the rectified distributions
-  basics = inner_join(basics.all,res,
-                      join_by(year,Sex),suffix=c('','.rectified'))
-  
-  if (cf==1) 
-    return(basics)
-  colnames(basics)
-  
-  convert.cols = grep('^mean|sd',colnames(basics))
-  basics[,convert.cols] = basics[,convert.cols]*cf
-  
-  convert.cols.sq = grep('^var',colnames(basics))
-  basics[,convert.cols.sq] = basics[,convert.cols.sq]*cf^2
-  
-  return(basics)
-}
-
-
-## ----basic-data-processing--------------------------------------------------------------------------------------------------------------------------------------------------------------
-freq0=hb.freq[hb.freq$data.set=='donation0',]
-
-# Rectify the male distribution from all years as an example
-rectifyDistribution(data0=NULL,freq=freq0[freq0$Sex=='Male',])
-
-rv=by(freq0,freq0[,c('Sex','year')],function(x) unlist(rectifyDistribution(data0=NULL,freq=x,plot=FALSE)$params))
-res=array2DF(rv)
-res$year=as.integer(res$year)
-
-# Basic statistics for the unrectified hb distributions
-basics.all = getStats(hb.freq,age.freq = age.freq)
-
-# Basic statistics joined with results from the rectified distributions
-basics = inner_join(basics.all,res,
-                    join_by(year,Sex),suffix=c('','.rectified'))
-
-
-## ----plotting---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-# means and such
-plotColBySex(basics,'mean','mean (actual data)')
-plotColBySex(basics,'mean.rectified','theoretical mean (rectified)')
-plotColBySex(basics,'sd','sd (actual data)')
-plotColBySex(basics,'sd.rectified','theoretical sd (rectified)')
-
-# deferral rates
-plotColBySex(basics,'deferred.prop','actual percentage deferred')
-plotColBySex(basics,'theoretical.deferred.prop','theoretical proportion deferred (unrectified distribution)')
-plotColBySex(basics,'deferred.prop.rectified','theoretical proportion deferred (rectified distribution)')
-# plotColBySex(basics,'dperc.lm','adjusted using estimated mean differences')
-
-
-## ----new-lm-approach--------------------------------------------------------------------------------------------------------------------------------------------------------------------
-newLMapproach = function(basics) {
-  # This block relies on basics, so need to make sure it can be computed with the summary data
-  # Plus must add countries overall
-  # This all seems to be based on basics
-  par(mar=c(2,4,0,0))
-  data=basics[basics$Sex=='Female',]
-  data.female=data
-  mean.female=mean(data$deferred.prop)
-  plot(deferred.prop~mean,data=data,ylim=c(0,0.15),xlim=c(130,160),col='red')
-  m=lm(deferred.prop~mean,data=data)
-  m1=lm(deferred.prop~mean+sd,data=data)
-  sm=summary(m)
-  sm1=summary(m1)
-  sm1.female=sm1
-  
-  m2.female=NULL
-  if ('young' %in% colnames(data)) {
-    m2.female=lm(deferred.prop~mean+sd+young+old,data=data)
-  }
-
-    abline(a=sm$coeff[1,1],b=sm$coeff[2,1],col='red',lty='dashed',lwd=2)
-  text(x=param$cutoff.male,y=0.03,labels=paste0('b=',round(sm1$coeff[2,1],3),'\np=',round(sm1$coeff[2,4],3),'\nR',intToUtf8(178),'=',round(sm1$r.squared,3)),adj=c(0))
-  data=basics[basics$Sex=='Male',]
-  m=lm(deferred.prop~mean,data=data)
-  m1=lm(deferred.prop~mean+sd,data=data)
-  sm=summary(m)
-  sm1=summary(m1)
-  abline(a=sm$coeff[1,1],b=sm$coeff[2,1],col='blue',lty='dashed',lwd=2)
-  points(data$mean,data$deferred.prop,col='blue')
-  text(x=155,y=0.06,labels=paste0('b=',round(sm1$coeff[2,1],3),'\np=',round(sm1$coeff[2,4],3),'\nR',intToUtf8(178),'=',round(sm1$r.squared,3)),adj=c(0))
-  plot(data$year,sm1.female$residuals,col='red',ylim=c(-0.05,0.05),type='l',ylab='residuals',lwd=3)
-  lines(data$year,sm1$residuals,col='blue',lwd=3)
-  mean.male=mean(data$deferred.prop)
-  lines(data$year,data.female$deferred.prop-mean.female,col='red',lty='dotted',lwd=2)
-  lines(data$year,data$deferred.prop-mean.male,col='blue',lty='dotted',lwd=2)
-  
-  year=data$year
-  residual=data.female$deferred.prop-mean.female
-  m=lm(residual~year)
-  summary(m)
-  
-  table(data$Sex)
-  m1=lm(deferred.prop~mean+sd+age,data=data)
-  summary(m1)
-  
-  m1=lm(deferred.prop~mean+sd+age,data=data.female)
-  summary(m1)
-
-  m2.male=NULL
-  if ('young' %in% colnames(data)) {
-    m2.male=lm(deferred.prop~mean+sd+young+old,data=data)
-  }
-  
-  return(list(m.female=m2.female,m.male=m2.male))
-}
-
-
-## ----experimental-results---------------------------------------------------------------------------------------------------------------------------------------------------------------
-# Do the young and old age proportions explain deferral rates:
-# They do, but only for men 
-rv=newLMapproach(basics)
-# summary(rv$m.female)
-# summary(rv$m.male)
-
-plotColBySex(basics,'old','proportion of 40+ yrs of age')
-
-
-## ----statistics-by-age------------------------------------------------------------------------------------------------------------------------------------------------------------------
-agedist = getStats(age.freq %>% filter(data.set=='all'),value.col='mean.hb',group.col='age',n.filter=100)
-plotColBySex(agedist,'mean',xvar = 'age',ylab='')
-
-plotColBySex(agedist,'n',xvar = 'age',ylab='')
-plotColBySex(agedist,'mean',xvar = 'age',ylab='')
-plotColBySex(agedist,'sd',xvar = 'age',ylab='')
-
-plotColBySex(basics,'age',xvar='year',ylab='age by year')
+# writing the results
+write.xlsx(list(models=res.models,curves=res.curves),file=param$result.file,rowNames=FALSE)
 

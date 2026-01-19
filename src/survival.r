@@ -8,11 +8,10 @@ library(openxlsx)
 param=list()
 param$data.file = "c:/git_repot/DATA/donationdata.fortimo.rdata" # fi
 param$donation.type.keys = c('Whole Blood (K)')
-param$max.sample.size=1e7 # This is still reasonably fast (< 1 min)
 param$cutoff.male=135
 param$cutoff.female=125
 param$max.ord.group.number=15
-
+param$max.sample.size=1e7 # This is still reasonably fast (< 1 min)
 param$omit.data=list()
 
 # For Finland, omit the donations from garrisons to create a second version of the data set
@@ -35,6 +34,13 @@ if (!exists('donationdata'))
 	load(param$data.file)
 
 ####
+
+# nb! This leads to smoother results, although not sure if it is justified
+# dim(dlink) 
+# [1] 6516688      23 # the not-so-smooth case
+# [1] 5955572      24 # the smooth case
+param$donation.type.keys=c("Whole Blood (K)")
+
 charid=unique(donationdata$donor$releaseID)
 id.map = data.frame(charid=charid,numid=1:length(charid))
 rownames(id.map)=id.map$charid
@@ -51,27 +57,32 @@ for (nm in names(param$omit.data)) {
 		filter(as.character(!!!syms(nm))!=param$omit.data[[nm]])
 }
 
-donation.simple = donationdata$donation[donationdata$donation$BloodDonationTypeKey %in% param$donation.type.keys,c('rowid','numid','DonationDate','Hb')] %>% 
-	inner_join(donationdata$donor[,c('numid','Sex','BloodGroup','DateOfBirth')],join_by(numid)) %>%
-	arrange(numid,DonationDate)
+# donation.simple = donationdata$donation[donationdata$donation$BloodDonationTypeKey %in% param$donation.type.keys,c('rowid','numid','DonationDate','Hb')] %>% 
+#	inner_join(donationdata$donor[,c('numid','Sex','BloodGroup','DateOfBirth')],join_by(numid)) %>%
+#	arrange(numid,DonationDate)
 
-# donation.simple$dtEnd = as.Date("2020-01-01") # nb! This is set to NA later
-# donation.simple$type = 'donation'
-# donation.simple$age= as.numeric(difftime(donation.simple$DonationDate,donation.simple$DateOfBirth),unit="weeks")/52.25
+# new variant adapted from the new export-data.file
+donation.simple = donationdata$donation[, c('rowid','numid',"BloodDonationTypeKey", "DonationDate", 
+                  "Hb", param$donation.cols)] %>% #  "DonationPlaceType","DonationPlaceCode"
+  filter(param$include.na || !is.na(Hb)) %>%
+  filter(BloodDonationTypeKey %in% param$donation.type.keys) %>%
+  # VisitNoDonation is used in Finland during the recent years instead of No Donation (E)
+  left_join(donationdata$donor[,c('numid',param$donor.cols)],join_by(numid)) %>%
+  arrange(numid,DonationDate) %>%
+  dplyr::select(-BloodDonationTypeKey)
+
 donation.simple = donation.simple %>% 
 	group_by(numid) %>%
 	mutate(ord = row_number()) %>%
 	ungroup() %>%
-	# dplyr::select(-DateOfBirth) %>%
 	rename(date=DonationDate)
 
-str(donation.simple)
-str(donation0)
 donation0=donation.simple %>% filter(ord==1) %>% dplyr::select(numid,date) %>% rename(date0=date)
 donation.simple=donation.simple %>%
 	inner_join(donation0,join_by(numid))
 
-colnames(donation.simple)=c('rowid','numid','date','hb','sex','bloodgroup','dateofbirth','ord','date0')
+# colnames(donation.simple)=c('rowid','numid','date','hb','sex','bloodgroup','dateofbirth','ord','date0')
+colnames(donation.simple)=tolower(colnames(donation.simple))
 
 donation.simple$bloodgr='other'
 donation.simple$bloodgr[donation.simple$bloodgroup=='O-']='O-'
@@ -230,11 +241,14 @@ getResults=function(dlink,spec) {
 res.models=getResults(dlink,spec) # do.call(rbind,dcox.list)
 res.curves=getResults(dlink,spec.curves)
 
+res.models$ord=(as.integer(res.models$ord.group))
+res.curves$ord=(as.integer(res.curves$ord.group))
+
 # writing the results
 write.xlsx(list(models=res.models,curves=res.curves),file=param$result.file,rowNames=FALSE)
 
 #####
-# Below, some plots are drawn
+# Below, some plots are drawn for survival data
 colours=list()
 colours[['top 10%']]='blue3'
 colours[['top 10-25%']]='lightblue'
@@ -298,7 +312,6 @@ bsAssign('df')
 dev.off()
 
 ce=do.call(rbind,dummy)
-str(ce)
 
 # nb! should use the similar implementation in the previous project to enable easier and more parametric
 # plotting with countries etc.

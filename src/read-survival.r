@@ -96,8 +96,8 @@ str(countries$fi)
 res.models=countries$fi$models
 res.curves=countries$fi$curves
 
-res.models$ord=(as.integer(res.models$ord.group))
-res.curves$ord=(as.integer(res.curves$ord.group))
+# res.models$ord=(as.integer(res.models$ord.group))
+# res.curves$ord=(as.integer(res.curves$ord.group))
 
 # nb! should check why the column name is wrong in that file
 colnames(res.curves)=sub('^cur$','sex',colnames(res.curves))
