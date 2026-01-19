@@ -64,16 +64,22 @@ are copied from the donor data to the working data set. The values can be copied
 from donor.cols to donation.cols to alter the behaviour. In addition, column(s) 
 that is used to compute the hour of the donation with the day, should be added
 to **donation.cols**, as is done country-specifically under **NL** and **FI**.
+- max.ord.group.number: the maximum number (ord) of donation that are considered as a separate group
+in survival analysis; the rest are estimated as a single group. The default is 15.
+- max.sample.size: the maximum number of sample (rows) used when estimated the Cox regressions
+in survival analysis. Default is 10e7. Can be decreased to improve performance.
+- omit.data: a list (of key-value pairs) containing description of donations that should be omitted.
+The *key* identifies the column in donationdata and *value* the value that should be omitted. For an
+example, see under the parameters specific to Finland.
 
 ## Exporting the data
 
-To export the data, code should be run from the start of this file 
-(** main-with-export.Rmd**) up to and including the chunk **export-data**. 
+To export the data, the file **src/export-data.r** should be run. 
 This includes setting the parameters (described) above, loading and processing 
 the data, extracting anonymous statistics and writing these to the 
-**exported-data.xlsx** file as described above.
+**exported-data-hb.xlsx** and **exported-data-survival.xlsx** file as described above.
 
-The statistics are anonymised by removing any groups with size smaller then 
+The hemoglobin statistics are anonymised by removing any groups with size smaller then 
 the parameter **minimum.group.size** (default 5). For Hb, small and large Hb
 values with fewer observations than the limit are pooled together and inxluded
 in the exported data using specific placeholders (-1000000 and 1000000). 
