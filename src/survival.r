@@ -226,7 +226,8 @@ agl=by(dlink,dlink[,'sex'],function(x) {
 		rdf=cbind(sex=x$sex[1],df,sm$conf.int)
 		colnames(rdf)=sub(' \\.','..',colnames(rdf))
 
-		rdf=rdf %>% filter(!is.na(ord.group))
+		# We would like to export this and remove while plotting
+		# rdf=rdf %>% filter(!is.na(ord.group))
 
 		return(rdf[,!grepl('\\(',colnames(rdf))])
 		return(df)
@@ -318,10 +319,16 @@ getIntervals = function(breaks) {
 pdf('results/figures.pdf')
 by(res.models,res.models[,c('sex','var')],function(y) {
 bsAssign('y')
+	y=y %>% filter(!is.na(ord))
 	plot(x=NULL,type='n',xlim=c(1,max(y$ord)),ylim=c(0.70,1.40),main=paste(y$sex[1],y$var[1]),
 		xlab='number of donation',ylab='relative likelihood of donation')
 	abline(h=1,lwd=2,lty='dotted')
 	breaks=y$breaks[1]
+
+	# factor out the age.group.t breaks
+	if (grepl(';',breaks))
+		breaks='-'
+
 	brk.labels=if (breaks!='-') getIntervals(breaks) else ''
 	levels=unique(y$level)
 	legend(x='bottomright',legend=paste(levels,brk.labels),fill=sapply(levels,function(x) {if (x %in% names(colours)) colours[[x]] else 'black'}))
