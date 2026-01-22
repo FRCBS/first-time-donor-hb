@@ -9,7 +9,7 @@ library(lubridate)
 library(tidyr)
 library(moments)
 library(openxlsx)
-
+library(survival)
 
 ## ----parameters-------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 param=list()
@@ -410,7 +410,6 @@ dlink$ord.group=as.factor(dlink$ord.group)
 dlink$dummy=NULL
 
 do.coxph.inner = function(data0) {
-bsAssign('data0')
 	hb.var=colnames(data0)[ncol(data0)]
 	sex0=data0$sex[1]
 

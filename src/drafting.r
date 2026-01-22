@@ -33,9 +33,18 @@ lines(sf0$upper~sf0$time,lty='dotted')
 # m=coxph(Surv(diff,event)~sex+group,data=dlink)
 # sm=summary(m)
 
+# 2026-01-22
+# load('model-126-ord-levels.Rdata')
+sm=summary(m.iso)
+sm$coeff
+sm$conf.int
+
 ###
 # Different ord's in the same model, modelling the coefficients
 # linear after log-log-transformation.
+# What is the correct transformation:
+# grc ~ log(beta) ~ beta is not the exp(beta)
+# x is the log of ord essentially
 wh=2:(nrow(sm$coeff)-1)
 grc=sm$coeff[wh,1]
 y=log(grc)
@@ -50,6 +59,13 @@ arrows(x,y.lower,x,y,length=0.05,angle=90,code=3,col='black')
 arrows(x,y,x,y.upper,length=0.05,angle=90,code=3,col='black')
 # plot(exp(grc))
 # sd=survdiff(Surv(diff,event)~sex,data=d0)
+
+y=grc
+x=log(1+log(1:length(grc)))
+m=lm(y~x)
+sm0=summary(m)
+sm0
+plot(y~x)
 
 # colours <- brewer.pal(n = 9, name = "Blues")
 nc=50

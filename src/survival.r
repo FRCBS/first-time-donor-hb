@@ -92,6 +92,9 @@ donation.simple$bloodgr=relevel(donation.simple$bloodgr,ref='other')
 donation.simple$age=as.numeric(difftime(donation.simple$date0,donation.simple$dateofbirth),unit="weeks")/52.25
 donation.simple$age.group=cut(donation.simple$age,breaks=c(0,25,40,100))
 
+donation.simple$age.t=as.numeric(difftime(donation.simple$date,donation.simple$dateofbirth),unit="weeks")/52.25
+donation.simple$age.group.t=cut(donation.simple$age,breaks=seq(15,75,by=5))
+
 donation.simple$ord.next=donation.simple$ord+1
 donation.simple$ord.prev=donation.simple$ord-1
 
@@ -143,14 +146,15 @@ dlink$ord.group=as.factor(dlink$ord.group)
 dlink$dummy=NULL
 
 do.coxph.inner = function(data0) {
-bsAssign('data0')
 	hb.var=colnames(data0)[ncol(data0)]
+print('===')
+print(hb.var)
 	sex0=data0$sex[1]
 
 	breaks.str='-'
 
 	data=data0[[hb.var]]
-	if (!is.factor(data) && length(unique(data)) > 10) {
+	if (!is.factor(data) && length(unique(data)) > 10 && hb.var %in% hb.vars) {
 		breaks.ord=quantile(data,prob=c(0,0.1,0.25,0.75,0.9,1),names=FALSE,na.rm=TRUE)
 		print(breaks.ord)
 		breaks.str=df.breaks %>% filter(sex==sex0,var==hb.var) %>% dplyr::select(breaks) %>% as.character()
@@ -201,16 +205,50 @@ bsAssign = function(name) {
 	assign(name,obj,.GlobalEnv)
 }
 
+dlink$ord.pwr=dlink$ord^(2/3)
+agl=by(dlink,dlink[,'sex'],function(x) {
+		print(x$sex[1])
+		wh=sample(1:nrow(x),100000)
+		m=coxph(Surv(diff,event)~ord.pwr+age.group.t,data=x[wh,])
+		print(summary(m))
+
+		sm=summary(m)
+		df=data.frame(sm$coeff)
+
+		# var='sub('(.+)(top|bottom).+','\\1',rownames(df))
+		# var=''
+		var='age.group.t'
+		level=1 # sub('age.group.t','',rownames(df))
+		df=cbind(var=var,level=level,ord.group=c(NA,grep(var,rownames(df))),df)
+		colnames(df)=c('var','level','ord.group','coef','exp.coef','se.coef','z','p.value')
+		df$breaks=paste(levels(x$age.group.t),collapse=';')
+
+		rdf=cbind(sex=x$sex[1],df,sm$conf.int)
+		colnames(rdf)=sub(' \\.','..',colnames(rdf))
+
+		rdf=rdf %>% filter(!is.na(ord.group))
+
+		return(rdf[,!grepl('\\(',colnames(rdf))])
+		return(df)
+	})
+res.models.age.t=do.call(rbind,agl)
+res.models.age.t$ord=as.integer(res.models.age.t$ord.group)
+
+# res.models=res.models %>% filter(var!='age.group.t')
+
+res.models=rbind(res.models,res.models.age.t)
+
 # interesting results: those with 'more hb tend to donate less frequently
 # Is it actually the case that the most active donors get their hb depleted
 # nb! This must be done 
 vars = c('avg.diff','hb.surplus','hb.change','age.group','bloodgr')
 hb.vars = c('avg.diff','hb.surplus','hb.change')
-spec=expand.grid(grp.var=c(NA,'sex'),hb.var=vars)
+# spec=expand.grid(grp.var=c(NA,'sex'),hb.var=vars)
 cols.prefix=c('diff','event','sex','ord.group')
 
 spec=data.frame(hb.var=vars)
 spec.curves=data.frame(hb.var='-')
+spec.age.t=data.frame(hb.var='age.group.t')
 
 # compute the breaks used to group hb-variables in the cox regressions
 res.breaks=lapply(hb.vars,function(x) {
@@ -224,22 +262,33 @@ res.breaks=lapply(hb.vars,function(x) {
 	})
 df.breaks=do.call(rbind,res.breaks)
 
-getResults=function(dlink,spec) {
+getResults=function(dlink,spec,replace.ord.group=NULL) {
 	res=by(spec,spec,function(x) {
 		if (x=='-') {
 			x=NULL
 		} else
 			x=c(t(x))
 		
-		coeff.list=by(dlink[,c(cols.prefix,x)],dlink[,c('sex','ord.group')],do.coxph.inner)
+
+		df=dlink
+bsAssign('df')
+		if (!is.null(replace.ord.group)) {
+			df$ord.group=NULL
+			colnames(df)=sub(replace.ord.group,'ord.group',colnames(df))
+			x='ord.pwr'
+		}
+
+		coeff.list=by(df[,c(cols.prefix,x)],df[,c('sex','ord.group')],do.coxph.inner)
 		res=do.call(rbind,coeff.list)
 		return(res)
 	})
+
 	return(do.call(rbind,res))
 }
 
 res.models=getResults(dlink,spec) # do.call(rbind,dcox.list)
 res.curves=getResults(dlink,spec.curves)
+res.models.age.t=getResults(dlink,spec.age.t,'age.group.t')
 
 res.models$ord=(as.integer(res.models$ord.group))
 res.curves$ord=(as.integer(res.curves$ord.group))
@@ -268,16 +317,17 @@ getIntervals = function(breaks) {
 
 pdf('results/figures.pdf')
 by(res.models,res.models[,c('sex','var')],function(y) {
+bsAssign('y')
 	plot(x=NULL,type='n',xlim=c(1,max(y$ord)),ylim=c(0.70,1.40),main=paste(y$sex[1],y$var[1]),
 		xlab='number of donation',ylab='relative likelihood of donation')
 	abline(h=1,lwd=2,lty='dotted')
 	breaks=y$breaks[1]
 	brk.labels=if (breaks!='-') getIntervals(breaks) else ''
 	levels=unique(y$level)
-	legend(x='bottomright',legend=paste(levels,brk.labels),fill=sapply(levels,function(x) colours[[x]]))
+	legend(x='bottomright',legend=paste(levels,brk.labels),fill=sapply(levels,function(x) {if (x %in% names(colours)) colours[[x]] else 'black'}))
 	by(y,y[,c('var','level')],function(x) {
 			gr=x$level[1]
-			col=colours[[gr]]
+			col=if (gr %in% names(colours)) colours[[gr]] else 'black'
 			ordint=x$ord
 			lines(ordint,x$exp.coef,lwd=2,col=col)
 			lines(ordint,x$lower..95,lwd=2,lty='dotted',col=col)
