@@ -93,7 +93,7 @@ donation.simple$age=as.numeric(difftime(donation.simple$date0,donation.simple$da
 donation.simple$age.group=cut(donation.simple$age,breaks=c(0,25,40,100))
 
 donation.simple$age.t=as.numeric(difftime(donation.simple$date,donation.simple$dateofbirth),unit="weeks")/52.25
-donation.simple$age.group.t=cut(donation.simple$age,breaks=seq(15,75,by=5))
+donation.simple$age.group.t=cut(donation.simple$age,breaks=c(seq(15,60,by=5),100))
 
 donation.simple$ord.next=donation.simple$ord+1
 donation.simple$ord.prev=donation.simple$ord-1
@@ -144,6 +144,7 @@ dlink$ord.group[dlink$ord.group>ord.group.number]=ord.group.number+1
 dlink$ord.group=as.factor(dlink$ord.group)
 
 dlink$dummy=NULL
+###
 
 do.coxph.inner = function(data0) {
 	hb.var=colnames(data0)[ncol(data0)]
@@ -226,11 +227,7 @@ agl=by(dlink,dlink[,'sex'],function(x) {
 		rdf=cbind(sex=x$sex[1],df,sm$conf.int)
 		colnames(rdf)=sub(' \\.','..',colnames(rdf))
 
-		# We would like to export this and remove while plotting
-		# rdf=rdf %>% filter(!is.na(ord.group))
-
 		return(rdf[,!grepl('\\(',colnames(rdf))])
-		return(df)
 	})
 res.models.age.t=do.call(rbind,agl)
 res.models.age.t$ord=as.integer(res.models.age.t$ord.group)
@@ -242,7 +239,7 @@ res.models=rbind(res.models,res.models.age.t)
 # interesting results: those with 'more hb tend to donate less frequently
 # Is it actually the case that the most active donors get their hb depleted
 # nb! This must be done 
-vars = c('avg.diff','hb.surplus','hb.change','age.group','bloodgr')
+vars = c('avg.diff','hb.surplus','hb.change','age.group','bloodgr','age.group.t')
 hb.vars = c('avg.diff','hb.surplus','hb.change')
 # spec=expand.grid(grp.var=c(NA,'sex'),hb.var=vars)
 cols.prefix=c('diff','event','sex','ord.group')
@@ -307,6 +304,12 @@ colours[['bottom 10%']]='red3'
 colours[['(25,40]']]='green3'
 colours[['(40,100]']]='gray3'
 colours[['O-']]='blue3'
+
+lvs=levels(dlink$age.group.t)
+palette=colorRampPalette(c("blue4", "white"))(length(lvs)+3)
+for (i in 1:length(lvs)) {
+	colours[[lvs[i]]]=palette[i]
+}
 
 getIntervals = function(breaks) {
 	brs=strsplit(breaks,',')[[1]]
