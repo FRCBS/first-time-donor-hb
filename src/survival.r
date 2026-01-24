@@ -64,7 +64,7 @@ for (nm in names(param$omit.data)) {
 # new variant adapted from the new export-data.file
 donation.simple = donationdata$donation[, c('rowid','numid',"BloodDonationTypeKey", "DonationDate", 
                   "Hb", param$donation.cols)] %>% #  "DonationPlaceType","DonationPlaceCode"
-  filter(param$include.na || !is.na(Hb)) %>%
+  filter(TRUE || !is.na(Hb)) %>% # param$include.na # nb! must check again
   filter(BloodDonationTypeKey %in% param$donation.type.keys) %>%
   # VisitNoDonation is used in Finland during the recent years instead of No Donation (E)
   left_join(donationdata$donor[,c('numid',param$donor.cols)],join_by(numid)) %>%
@@ -94,6 +94,33 @@ donation.simple$age.group=cut(donation.simple$age,breaks=c(0,25,40,100))
 
 donation.simple$age.t=as.numeric(difftime(donation.simple$date,donation.simple$dateofbirth),unit="weeks")/52.25
 donation.simple$age.group.t=cut(donation.simple$age,breaks=c(seq(15,60,by=5),100))
+donation.simple$age.group.t=relevel(donation.simple$age.group.t,ref='(40,45]')
+
+donation.simple$age.stats=round(donation.simple$age,0) # cut(donation.simple$age,breaks=15:75)
+donation.simple$age.stats.t=round(donation.simple$age.t,0) # cut(donation.simple$age,breaks=15:75)
+
+# nb! should include stats as well in the results
+# maybe a full age distribution (per year) of first and all donations
+stats.age=donation.simple %>%
+	group_by(sex,age.stats) %>%
+	summarise(n=n(),mean.hb=mean(hb,na.rm=TRUE),.groups='drop') %>%
+	filter(n>=30) %>%
+	data.frame()
+
+stats.age.t=donation.simple %>%
+	group_by(sex,age.stats.t) %>%
+	summarise(n=n(),mean.hb=mean(hb,na.rm=TRUE),.groups='drop') %>%
+	filter(n>=30) %>%
+	data.frame()
+
+stats.ord=donation.simple %>%
+	group_by(sex,ord) %>%
+	summarise(n=n(),mean.hb=mean(hb,na.rm=TRUE),.groups='drop') %>%
+	filter(n>=30) %>%
+	data.frame()
+
+donation.simple$age.stats=NULL
+donation.simple$age.stats.t=NULL
 
 donation.simple$ord.next=donation.simple$ord+1
 donation.simple$ord.prev=donation.simple$ord-1
@@ -148,8 +175,6 @@ dlink$dummy=NULL
 
 do.coxph.inner = function(data0) {
 	hb.var=colnames(data0)[ncol(data0)]
-print('===')
-print(hb.var)
 	sex0=data0$sex[1]
 
 	breaks.str='-'
@@ -157,11 +182,11 @@ print(hb.var)
 	data=data0[[hb.var]]
 	if (!is.factor(data) && length(unique(data)) > 10 && hb.var %in% hb.vars) {
 		breaks.ord=quantile(data,prob=c(0,0.1,0.25,0.75,0.9,1),names=FALSE,na.rm=TRUE)
-		print(breaks.ord)
+		# print(breaks.ord)
 		breaks.str=df.breaks %>% filter(sex==sex0,var==hb.var) %>% dplyr::select(breaks) %>% as.character()
 		breaks.common=strsplit(breaks.str,',')[[1]]
-		print(paste('***',breaks.ord))
-		print(breaks.common)
+		# print(paste('***',breaks.ord))
+		# print(breaks.common)
 		data=cut(data,breaks.common)
 		levels(data)=c('bottom 10%','bottom 10-25%','mid','top 10-25%','top 10%')
 		data=relevel(data,ref='mid')
@@ -176,8 +201,15 @@ print(hb.var)
 
 	og0=data0$ord.group[1]
 
-	data0 = data0 %>%
-		dplyr::select(-ord.group,-sex)
+	if (hb.var=='sex') {
+		wh=which(colnames(data0)=='sex')
+		data0=data0[,-wh[1]]
+		data0 = data0 %>%
+			dplyr::select(-ord.group)
+	} else {
+		data0 = data0 %>%
+			dplyr::select(-ord.group,-sex)
+	}
 
 	frml.char=paste0('Surv(diff,event)~.')
 	m=coxph(formula(frml.char),data=data0)
@@ -189,7 +221,6 @@ print(hb.var)
 
 	sm=summary(m)
 	df=data.frame(sm$coeff)
-
 	var=sub('(.+)(top|bottom).+','\\1',rownames(df))
 	level=sub(hb.var,'',rownames(df))
 	df=cbind(var=hb.var,level=level,ord.group=og0,df)
@@ -208,7 +239,8 @@ bsAssign = function(name) {
 
 dlink$ord.pwr=dlink$ord^(2/3)
 agl=by(dlink,dlink[,'sex'],function(x) {
-		print(x$sex[1])
+		# must parameterise sampling
+		# nb! Should also add timing to the script
 		wh=sample(1:nrow(x),100000)
 		m=coxph(Surv(diff,event)~ord.pwr+age.group.t,data=x[wh,])
 		print(summary(m))
@@ -216,21 +248,22 @@ agl=by(dlink,dlink[,'sex'],function(x) {
 		sm=summary(m)
 		df=data.frame(sm$coeff)
 
-		# var='sub('(.+)(top|bottom).+','\\1',rownames(df))
-		# var=''
 		var='age.group.t'
-		level=1 # sub('age.group.t','',rownames(df))
-		df=cbind(var=var,level=level,ord.group=c(NA,grep(var,rownames(df))),df)
+		level=1
+		df=cbind(var=var,level=level,ord=as.integer(c(NA,grep(var,rownames(df)))),df)
 		colnames(df)=c('var','level','ord.group','coef','exp.coef','se.coef','z','p.value')
 		df$breaks=paste(levels(x$age.group.t),collapse=';')
 
 		rdf=cbind(sex=x$sex[1],df,sm$conf.int)
 		colnames(rdf)=sub(' \\.','..',colnames(rdf))
 
+		rdf$ord.group=as.integer(rdf$ord.group)
+		colnames(rdf)=sub('^ord.group$','ord',colnames(rdf)) # $ord.group=NULL
+
 		return(rdf[,!grepl('\\(',colnames(rdf))])
 	})
 res.models.age.t=do.call(rbind,agl)
-res.models.age.t$ord=as.integer(res.models.age.t$ord.group)
+# res.models.age.t$ord=as.integer(res.models.age.t$ord.group)
 
 # res.models=res.models %>% filter(var!='age.group.t')
 
@@ -239,7 +272,7 @@ res.models=rbind(res.models,res.models.age.t)
 # interesting results: those with 'more hb tend to donate less frequently
 # Is it actually the case that the most active donors get their hb depleted
 # nb! This must be done 
-vars = c('avg.diff','hb.surplus','hb.change','age.group','bloodgr','age.group.t')
+vars = c('sex','avg.diff','hb.surplus','hb.change','age.group','bloodgr','age.group.t')
 hb.vars = c('avg.diff','hb.surplus','hb.change')
 # spec=expand.grid(grp.var=c(NA,'sex'),hb.var=vars)
 cols.prefix=c('diff','event','sex','ord.group')
@@ -269,30 +302,101 @@ getResults=function(dlink,spec,replace.ord.group=NULL) {
 		
 
 		df=dlink
-bsAssign('df')
 		if (!is.null(replace.ord.group)) {
 			df$ord.group=NULL
 			colnames(df)=sub(replace.ord.group,'ord.group',colnames(df))
 			x='ord.pwr'
 		}
 
-		coeff.list=by(df[,c(cols.prefix,x)],df[,c('sex','ord.group')],do.coxph.inner)
+		coeff.list=by(df[,c(cols.prefix,x)],df[,setdiff(c('sex','ord.group'),x)],do.coxph.inner)
 		res=do.call(rbind,coeff.list)
+		res$ord.group=as.integer(res$ord.group)
+		colnames(res)=sub('^ord.group$','ord',colnames(res))
 		return(res)
 	})
 
 	return(do.call(rbind,res))
 }
 
-res.models=getResults(dlink,spec) # do.call(rbind,dcox.list)
+res.models=getResults(dlink,spec) # nb! testing sex
 res.curves=getResults(dlink,spec.curves)
 res.models.age.t=getResults(dlink,spec.age.t,'age.group.t')
 
-res.models$ord=(as.integer(res.models$ord.group))
-res.curves$ord=(as.integer(res.curves$ord.group))
+### estimate a model with all the 
+max.sample.size=2000
+dlink.sampled=do.call(rbind,by(dlink,dlink[,c('sex','ord')],function(x) {
+		if (nrow(x) < 100)
+			return(NULL)
 
-# writing the results
-write.xlsx(list(models=res.models,curves=res.curves),file=param$result.file,rowNames=FALSE)
+		wh=1:nrow(x)
+		if (nrow(x) > max.sample.size) {
+			wh=sample(wh,max.sample.size)
+		}
+		print(paste(x$ord[1],':',nrow(x),length(wh)))
+		return(x[wh,])
+	}))
+
+# This would be too slow; similar results obtained below using res.models.full
+# dlink.sampled$ord.group=as.factor(dlink.sampled$ord)
+# m=coxph(Surv(diff,event)~ord.group*sex,data=dlink.sampled)
+# sm=summary(m)
+# m.sex.ord.interaction=m
+
+flist=by(dlink.sampled,dlink.sampled$sex,function(x) {
+		x$ord.group=as.factor(x$ord)
+		m=coxph(Surv(diff,event)~ord.group,data=x)
+		sm=summary(m)
+		print(sm)
+
+		df=data.frame(sm$coeff)
+		var='ord.group.full'
+		level=sub('ord.group','',rownames(df))
+		df=cbind(var=var,level=level,ord=level,df)
+		colnames(df)=c('var','level','ord.group','coef','exp.coef','se.coef','z','p.value')
+		df$breaks='-' 
+
+		rdf=cbind(sex=x$sex[1],df,sm$conf.int)
+		colnames(rdf)=sub(' \\.','..',colnames(rdf))
+
+		rdf$ord.group=as.integer(rdf$ord.group)
+		colnames(rdf)=sub('^ord.group$','ord',colnames(rdf)) # $ord.group=NULL
+
+		return(rdf[,!grepl('\\(',colnames(rdf))])
+	})
+res.models.full=do.call(rbind,flist)
+
+res.models.all=rbind(res.models,res.models.age.t,res.models.full)
+
+# writing the results: export
+cbs=100000 # curve.batch.size # nb! could be a parameter
+curve.batches=1:(nrow(res.curves) %/% cbs + 1)
+curve.batches=curve.batches[-1]
+
+bsFlatten = function(x) {
+		if (is.function(param[[x]])) 
+			return(NULL)
+
+		if (is.list(param[[x]])) {
+			df=data.frame(name=paste0(x,':',names(z)),value=as.character(z))
+			colnames(df)=c('name','value')
+			return(df)
+			# return(lapply(param[[x]],function(y) data.frame(name=names(y),value=as.vector(y))))
+		}
+	
+		data.frame(name=x,value=param[[x]])
+	}
+tst=lapply(names(param),bsFlatten)
+df.param=do.call(rbind,tst)
+
+# param$omit.data=list(a='test',b='boo')
+
+write.xlsx(list(param=df.param,stats.age=stats.age,stats.age.t=stats.age.t,stats.ord=stats.ord,models=res.models.all,curves=res.curves[1:min(cbs,nrow(res.curves)),]),file=param$result.file,rowNames=FALSE)
+sapply(curve.batches,FUN=function(x) {
+		row.0=((x-1)*cbs+1)
+		row.1=min((x*cbs),nrow(res.curves))
+		write.xlsx(list(curves=res.curves[row.0:row.1,]),file=sub('\\.xlsx',paste0('-',x,'.xlsx'),param$result.file),rowNames=FALSE)
+		return(c(row.0,row.1))
+	})
 
 #####
 # Below, some plots are drawn for survival data
@@ -304,11 +408,18 @@ colours[['bottom 10%']]='red3'
 colours[['(25,40]']]='green3'
 colours[['(40,100]']]='gray3'
 colours[['O-']]='blue3'
+colours[['general']]='black'
 
 lvs=levels(dlink$age.group.t)
 palette=colorRampPalette(c("blue4", "white"))(length(lvs)+3)
+
+library(RColorBrewer)
+qual_col_pals = brewer.pal.info[brewer.pal.info$category=='qual',]
+# col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+col_vector=c('#7FC97F','#BEAED4','#FDC086','#FFFF99','#386CB0','#F0027F','#BF5B17','#666666','#1B9E77','#D95F02','#7570B3','#E7298A','#66A61E','#E6AB02','#A6761D','#666666','#A6CEE3','#1F78B4','#B2DF8A','#33A02C','#FB9A99','#E31A1C','#FDBF6F','#FF7F00','#CAB2D6','#6A3D9A','#FFFF99','#B15928','#FBB4AE','#B3CDE3','#CCEBC5','#DECBE4','#FED9A6','#FFFFCC','#E5D8BD','#FDDAEC','#F2F2F2','#B3E2CD','#FDCDAC','#CBD5E8','#F4CAE4','#E6F5C9','#FFF2AE','#F1E2CC','#CCCCCC','#E41A1C','#377EB8','#4DAF4A','#984EA3','#FF7F00','#FFFF33','#A65628','#F781BF','#999999','#66C2A5','#FC8D62','#8DA0CB','#E78AC3','#A6D854','#FFD92F','#E5C494','#B3B3B3','#8DD3C7','#FFFFB3','#BEBADA','#FB8072','#80B1D3','#FDB462','#B3DE69','#FCCDE5','#D9D9D9','#BC80BD','#CCEBC5','#FFED6F')
+
 for (i in 1:length(lvs)) {
-	colours[[lvs[i]]]=palette[i]
+	colours[[lvs[i]]]=if (i<length(lvs)) col_vector[i] else 'white' # palette[i]
 }
 
 getIntervals = function(breaks) {
@@ -319,25 +430,49 @@ getIntervals = function(breaks) {
 	return(c(lower,mid.bits[-2],upper))
 }
 
+y=res.models.all %>% filter(sex=='Female',var=='ord.group.full')
+
 pdf('results/figures.pdf')
-by(res.models,res.models[,c('sex','var')],function(y) {
-bsAssign('y')
+by(res.models.all,res.models.all[,c('sex','var')],function(y) {
+	if (length(unique(y$level))==1)
+		y$level='general'
+
 	y=y %>% filter(!is.na(ord))
-	plot(x=NULL,type='n',xlim=c(1,max(y$ord)),ylim=c(0.70,1.40),main=paste(y$sex[1],y$var[1]),
+
+	if (nrow(y) == 1)
+		return(NULL)
+
+	ylim=c(min(y$exp.coef,na.rm=TRUE),max(y$exp.coef,na.rm=TRUE)) #c(0.70,1.40)
+	y.delta=ylim[2]-ylim[1]
+	ylim=c(ylim[1]-0.3*y.delta,ylim[2]+0.2*y.delta)
+	plot(x=NULL,type='n',xlim=c(1,max(y$ord)),ylim=ylim,main=paste(y$sex[1],y$var[1]),
 		xlab='number of donation',ylab='relative likelihood of donation')
-	abline(h=1,lwd=2,lty='dotted')
+	abline(h=1,lwd=1,lty='dashed')
 	breaks=y$breaks[1]
 
 	# factor out the age.group.t breaks
 	if (grepl(';',breaks))
-		breaks='-'
+		breaks='-' 
+
+	col.fun=function(x) {if (x %in% names(colours)) colours[[x]] else 'white'}
+
+	if (max(y$ord) == param$max.ord.group.number+1) 
+		abline(v=max(y$ord)-0.5,lwd=1,lty='dashed')
 
 	brk.labels=if (breaks!='-') getIntervals(breaks) else ''
 	levels=unique(y$level)
-	legend(x='bottomright',legend=paste(levels,brk.labels),fill=sapply(levels,function(x) {if (x %in% names(colours)) colours[[x]] else 'black'}))
-	by(y,y[,c('var','level')],function(x) {
+	if (length(levels) > 1) {
+		fill=sapply(levels,col.fun)
+		levels=levels[fill!='white']
+		fill=fill[fill!='white']
+		legend(x='bottomright',legend=paste(levels,brk.labels),fill=sapply(levels,col.fun))
+	}
+
+	res.void=by(y,y[,c('var','level')],function(x) {
 			gr=x$level[1]
-			col=if (gr %in% names(colours)) colours[[gr]] else 'black'
+			col=col.fun(gr)
+			if (col=='white')
+				return(NULL)
 			ordint=x$ord
 			lines(ordint,x$exp.coef,lwd=2,col=col)
 			lines(ordint,x$lower..95,lwd=2,lty='dotted',col=col)
@@ -348,7 +483,6 @@ dev.off()
 
 pdf('results/curves.pdf')
 dummy=by(res.curves,res.curves[,c('sex','ord')],function(df) {
-bsAssign('df')
 		wh=min(which(df$surv<0.99))
 		len0=length(df$surv)
 		df=df[wh:len0,]
@@ -356,7 +490,7 @@ bsAssign('df')
 		df$time=df$time[wh:len0]-wh
 		df$sqrt.x=sqrt(df$time)
 
-		# This is promising, but seems not to work after all
+		# This is promising based on description, but seems not to work after all
 		# m.ss=nls(surv~SSweibull(time,yf,y0,log_alpha,poweri),data=df)
 		m.ss=nls(surv~SSasymp(sqrt.x,yf,y0,log_alpha),data=df)
 		sm=summary(m.ss)
