@@ -377,18 +377,16 @@ bsFlatten = function(x) {
 			return(NULL)
 
 		if (is.list(param[[x]])) {
+			z=param[[x]]
 			df=data.frame(name=paste0(x,':',names(z)),value=as.character(z))
 			colnames(df)=c('name','value')
 			return(df)
-			# return(lapply(param[[x]],function(y) data.frame(name=names(y),value=as.vector(y))))
 		}
 	
 		data.frame(name=x,value=param[[x]])
 	}
 tst=lapply(names(param),bsFlatten)
 df.param=do.call(rbind,tst)
-
-# param$omit.data=list(a='test',b='boo')
 
 write.xlsx(list(param=df.param,stats.age=stats.age,stats.age.t=stats.age.t,stats.ord=stats.ord,models=res.models.all,curves=res.curves[1:min(cbs,nrow(res.curves)),]),file=param$result.file,rowNames=FALSE)
 sapply(curve.batches,FUN=function(x) {

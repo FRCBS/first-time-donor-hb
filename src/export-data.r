@@ -79,6 +79,9 @@ if (param$country == 'NL') {
   }
   param$donor.cols = c('BloodGroup')
   param$donation.cols = c('Sex','DateOfBirth','DonationTimeStart')
+
+  # 2026-01-26 For survival analysis, the data should be restricted to successful first-time donations
+  param$donation.type.keys.survival=c("Whole Blood (K)")
 } else if (param$country == 'FI') {
   param$data.file = 'C:/git_repot/DATA/donationdata.fortimo.rdata'
   param$units = 'g/L' # one of: mmol/L or g/L or g/dL
@@ -110,7 +113,10 @@ if (param$country == 'NL') {
   param$hb.maximum = 250
   param$data.sets = c('donation0','donation.r','simple')
   param$donation.type.keys = c('Whole Blood (K)','No Donation (E)','VisitNoDonation')
+
+  # 2026-01-26 For survival analysis, the data should be restricted to successful first-time donations
   param$donation.type.keys.survival=c("Whole Blood (K)")
+
   param$hb.decimals = 0
   param$extractHour = function(simple) {
     return(as.integer(format(simple$DonationTimeDTTM,'%H')))
@@ -299,7 +305,7 @@ for (ds in data.sets) {
 ## ----export-data----------
 write.xlsx(list(parameters=data.frame(name=names(param),value=paste(param,sep=',')),
                 annual.hb=hb.freq,annual.age=age.freq,montly.statistics=monthly,hourly.statistics=hourly),
-           file=param$result.file)
+           file=sub('\\.xlsx$','-hb.xlsx',param$result.file))
 
 #####################
 # process survival data
@@ -332,7 +338,7 @@ for (nm in names(param$omit.data)) {
 donation.simple = donationdata$donation[, c('rowid','numid',"BloodDonationTypeKey", "DonationDate", 
                   "Hb", param$donation.cols)] %>% #  "DonationPlaceType","DonationPlaceCode"
   filter(TRUE || !is.na(Hb)) %>% # param$include.na # nb! must check again
-  filter(BloodDonationTypeKey %in% param$donation.type.keys) %>%
+  filter(BloodDonationTypeKey %in% param$donation.type.keys.survival) %>%
   # VisitNoDonation is used in Finland during the recent years instead of No Donation (E)
   left_join(donationdata$donor[,c('numid',param$donor.cols)],join_by(numid)) %>%
   arrange(numid,DonationDate) %>%
@@ -530,11 +536,6 @@ agl=by(dlink,dlink[,'sex'],function(x) {
 		return(rdf[,!grepl('\\(',colnames(rdf))])
 	})
 res.models.age.t=do.call(rbind,agl)
-# res.models.age.t$ord=as.integer(res.models.age.t$ord.group)
-
-# res.models=res.models %>% filter(var!='age.group.t')
-
-res.models=rbind(res.models,res.models.age.t)
 
 # interesting results: those with 'more hb tend to donate less frequently
 # Is it actually the case that the most active donors get their hb depleted
@@ -585,11 +586,13 @@ getResults=function(dlink,spec,replace.ord.group=NULL) {
 	return(do.call(rbind,res))
 }
 
-res.models=getResults(dlink,spec) # nb! testing sex
+res.models=getResults(dlink,spec)
 res.curves=getResults(dlink,spec.curves)
 res.models.age.t=getResults(dlink,spec.age.t,'age.group.t')
 
-### estimate a model with all the 
+### estimate a model with all the ord-levels as a factor
+# separately for sex
+# the data is sampled to keep the model size (and time required to estimate it) reasonable
 max.sample.size=2000
 dlink.sampled=do.call(rbind,by(dlink,dlink[,c('sex','ord')],function(x) {
 		if (nrow(x) < 100)
@@ -618,7 +621,7 @@ flist=by(dlink.sampled,dlink.sampled$sex,function(x) {
 		df=data.frame(sm$coeff)
 		var='ord.group.full'
 		level=sub('ord.group','',rownames(df))
-		df=cbind(var=var,level=level,ord=level,df)
+		df=cbind(var=var,level=1,ord=level,df)
 		colnames(df)=c('var','level','ord.group','coef','exp.coef','se.coef','z','p.value')
 		df$breaks='-' 
 
@@ -644,18 +647,16 @@ bsFlatten = function(x) {
 			return(NULL)
 
 		if (is.list(param[[x]])) {
+			z=param[[x]]
 			df=data.frame(name=paste0(x,':',names(z)),value=as.character(z))
 			colnames(df)=c('name','value')
 			return(df)
-			# return(lapply(param[[x]],function(y) data.frame(name=names(y),value=as.vector(y))))
 		}
 	
 		data.frame(name=x,value=param[[x]])
 	}
 tst=lapply(names(param),bsFlatten)
 df.param=do.call(rbind,tst)
-
-# param$omit.data=list(a='test',b='boo')
 
 write.xlsx(list(param=df.param,stats.age=stats.age,stats.age.t=stats.age.t,stats.ord=stats.ord,models=res.models.all,curves=res.curves[1:min(cbs,nrow(res.curves)),]),file=sub('\\.xlsx$','-survival.xlsx',param$result.file),rowNames=FALSE)
 sapply(curve.batches,FUN=function(x) {
