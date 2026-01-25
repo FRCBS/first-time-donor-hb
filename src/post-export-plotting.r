@@ -444,12 +444,11 @@ by(res.models.all,res.models.all[,c('sex','var')],function(y) {
 	})
 dev.off()
 
-pdf('results/surviva-curves.pdf')
+pdf('results/survival-curves.pdf')
 dummy=by(res.curves,res.curves[,c('sex','ord')],function(df) {
 		wh=min(which(df$surv<0.99))
 		len0=length(df$surv)
 		df=df[wh:len0,]
-		# df$surv=df$surv[wh:len0]
 		df$time=df$time[wh:len0]-wh
 		df$sqrt.x=sqrt(df$time)
 
@@ -459,7 +458,7 @@ dummy=by(res.curves,res.curves[,c('sex','ord')],function(df) {
 		sm=summary(m.ss)
 
 		plot(surv~time,data=df,type='l',lwd=2,xlim=c(0,2*365),ylim=c(0,1),
-			main=paste(df$sex[1],df$ord.group[1]))
+			main=paste(df$sex[1],df$ord[1]))
 		pred.ss=predict(m.ss,data.frame(sqrt.x=df$sqrt.x))
 		lines(df$time,pred.ss,col='red2',lwd=2.5)
 

@@ -330,10 +330,6 @@ for (nm in names(param$omit.data)) {
 		filter(as.character(!!!syms(nm))!=param$omit.data[[nm]])
 }
 
-# donation.simple = donationdata$donation[donationdata$donation$BloodDonationTypeKey %in% param$donation.type.keys.survival,c('rowid','numid','DonationDate','Hb')] %>% 
-#	inner_join(donationdata$donor[,c('numid','Sex','BloodGroup','DateOfBirth')],join_by(numid)) %>%
-#	arrange(numid,DonationDate)
-
 # new variant adapted from the new export-data.file
 donation.simple = donationdata$donation[, c('rowid','numid',"BloodDonationTypeKey", "DonationDate", 
                   "Hb", param$donation.cols)] %>% #  "DonationPlaceType","DonationPlaceCode"
@@ -354,13 +350,27 @@ donation0=donation.simple %>% filter(ord==1) %>% dplyr::select(numid,date) %>% r
 donation.simple=donation.simple %>%
 	inner_join(donation0,join_by(numid))
 
-# colnames(donation.simple)=c('rowid','numid','date','hb','sex','bloodgroup','dateofbirth','ord','date0')
 colnames(donation.simple)=tolower(colnames(donation.simple))
 
 donation.simple$bloodgr='other'
 donation.simple$bloodgr[donation.simple$bloodgroup=='O-']='O-'
 donation.simple$bloodgr=as.factor(donation.simple$bloodgr)
 donation.simple$bloodgr=relevel(donation.simple$bloodgr,ref='other')
+
+# making sure that the donation numbers are counted correctly
+# exclude donor that had their first donation during the first two years of data
+# except for those who were under 18 year of age at date start
+dt.min=min(donation.simple$date)
+
+dt.cutoff=dt.min+2*7*52.25
+wh=which(donation.simple$date0<dt.cutoff)
+exclude.donors=unique(donation.simple$numid[wh])
+donation.simple$age.at.dt.min=as.numeric(difftime(dt.min,donation.simple$dateofbirth),unit="weeks")/52.25
+include.donors=unique(donation.simple$numid[which(donation.simple$age.at.dt.min<18)])
+hist(donation.simple$age.at.dt.min)
+final.exclude=setdiff(exclude.donors,include.donors)
+
+donation.simple = donation.simple %>% filter(!numid %in% final.exclude)
 
 donation.simple$age=as.numeric(difftime(donation.simple$date0,donation.simple$dateofbirth),unit="weeks")/52.25
 donation.simple$age.group=cut(donation.simple$age,breaks=c(0,25,40,100))
@@ -455,11 +465,8 @@ do.coxph.inner = function(data0) {
 	data=data0[[hb.var]]
 	if (!is.factor(data) && length(unique(data)) > 10 && hb.var %in% hb.vars) {
 		breaks.ord=quantile(data,prob=c(0,0.1,0.25,0.75,0.9,1),names=FALSE,na.rm=TRUE)
-		# print(breaks.ord)
 		breaks.str=df.breaks %>% filter(sex==sex0,var==hb.var) %>% dplyr::select(breaks) %>% as.character()
 		breaks.common=strsplit(breaks.str,',')[[1]]
-		# print(paste('***',breaks.ord))
-		# print(breaks.common)
 		data=cut(data,breaks.common)
 		levels(data)=c('bottom 10%','bottom 10-25%','mid','top 10-25%','top 10%')
 		data=relevel(data,ref='mid')
@@ -516,8 +523,6 @@ agl=by(dlink,dlink[,'sex'],function(x) {
 		# nb! Should also add timing to the script
 		wh=sample(1:nrow(x),100000)
 		m=coxph(Surv(diff,event)~ord.pwr+age.group.t,data=x[wh,])
-		print(summary(m))
-
 		sm=summary(m)
 		df=data.frame(sm$coeff)
 
@@ -602,7 +607,7 @@ dlink.sampled=do.call(rbind,by(dlink,dlink[,c('sex','ord')],function(x) {
 		if (nrow(x) > max.sample.size) {
 			wh=sample(wh,max.sample.size)
 		}
-		print(paste(x$ord[1],':',nrow(x),length(wh)))
+		# print(paste(x$ord[1],':',nrow(x),length(wh)))
 		return(x[wh,])
 	}))
 
@@ -616,7 +621,7 @@ flist=by(dlink.sampled,dlink.sampled$sex,function(x) {
 		x$ord.group=as.factor(x$ord)
 		m=coxph(Surv(diff,event)~ord.group,data=x)
 		sm=summary(m)
-		print(sm)
+		# print(sm)
 
 		df=data.frame(sm$coeff)
 		var='ord.group.full'
