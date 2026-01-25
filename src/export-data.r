@@ -307,6 +307,10 @@ write.xlsx(list(parameters=data.frame(name=names(param),value=paste(param,sep=',
                 annual.hb=hb.freq,annual.age=age.freq,montly.statistics=monthly,hourly.statistics=hourly),
            file=sub('\\.xlsx$','-hb.xlsx',param$result.file))
 
+# remove unnecessary objects to free up some memory
+# sort( sapply(ls(),function(x){object.size(get(x))})) 
+rm(list=c('simple','donation.r','donation0'))
+
 #####################
 # process survival data
 
@@ -440,6 +444,9 @@ dlink = donation.simple %>%
 	left_join(donation.simple[,c('numid','ord','hb')],join_by(numid,x$ord.prev==y$ord),suffix=c('','.prev')) %>%
 	dplyr::select(-ord.next,-ord.prev) %>%
 	mutate(hb.change=hb-hb.prev)
+
+# free the simple table to free up some memory
+rm(donation.simple)
 
 # dlink$hb.change[dlink$ord==1]=NA
 dlink$hb.change[is.na(dlink$hb.change)]=NA
@@ -600,6 +607,9 @@ res.models.age.t=getResults(dlink,spec.age.t,'age.group.t')
 # the data is sampled to keep the model size (and time required to estimate it) reasonable
 max.sample.size=2000
 dlink.sampled=do.call(rbind,by(dlink,dlink[,c('sex','ord')],function(x) {
+		if (x$ord[1] > 120) 
+			return(NULL)
+
 		if (nrow(x) < 100)
 			return(NULL)
 
