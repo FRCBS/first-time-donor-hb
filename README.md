@@ -32,8 +32,11 @@ are included.
 Default is yes (**TRUE**).
 - minimum.group.size: The smallest group size (*n*) that is exported.
 - donation.type.keys: Which values in **donationdata$donation$BloodDonationTypeKey**
-are included in the analysis. The idea is to consider full blood donations, 
-either successful or deferred cases.
+are included in the hemoglobin analysis. The idea is to consider full blood donations, 
+either successful or deferred cases. The default is `c('Whole Blood (K)','No Donation (E)','VisitNoDonation')`
+- donation.type.keys.survival: Which values in **donationdata$donation$BloodDonationTypeKey**
+are included in the **survival analysis**. **NB! Only successful full blood donations should be
+included here.** The default is "Whole Blood (K)".
 - hb.decimals: The number of decimals in Hb values that should be used.
 - donationdata: Path to the .Rdata file containing the data to be used. This is
 hard-coded by default to **donationdata.Rdata** in the working directory. If the 
@@ -72,14 +75,24 @@ in survival analysis. Default is 10e7. Can be decreased to improve performance.
 The *key* identifies the column in donationdata and *value* the value that should be omitted. For an
 example, see under the parameters specific to Finland.
 
-## Exporting the data
-
-To export the data, the file **src/export-data.r** should be run. 
-This includes setting the parameters (described) above, loading and processing 
-the data, extracting anonymous statistics and writing these to the 
-**exported-data-hb.xlsx** and **exported-data-survival.xlsx** file as described above.
-
 The hemoglobin statistics are anonymised by removing any groups with size smaller then 
 the parameter **minimum.group.size** (default 5). For Hb, small and large Hb
 values with fewer observations than the limit are pooled together and inxluded
 in the exported data using specific placeholders (-1000000 and 1000000). 
+
+## Exporting the data
+
+To export the data, the file **src/export-data.r** should be run. 
+This includes setting the parameters (described) above. When the code is run, 
+it loads and processes the data, and extracts anonymous statistics and writes these to the 
+**exported-data-hb.xlsx** and **exported-data-survival.xlsx** files. The latter file may be 
+split into parts of maximum 100,000 lines of survival curves, with the second etc. file 
+identified by a running number before the extension, eg. **exported-data-survival-2.xlsx**. This
+is done to make individual files small enough to be sent as an email attachment. Please be sure to
+send all the .xlsx-files.
+
+## Post-export plotting
+
+The file **src/post-export-plotting.r** can be run (with the objects from exporting the data still in memory)
+to produce some visualisations of the data. The visualisations are saved as PDF files in the **results** directory, ie.
+the same directory in which the .xlsx-files are written.
