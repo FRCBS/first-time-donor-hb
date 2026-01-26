@@ -366,6 +366,8 @@ donation.simple$bloodgr=relevel(donation.simple$bloodgr,ref='other')
 # except for those who were under 18 year of age at date start
 dt.min=min(donation.simple$date)
 
+param$dt.min=dt.min
+
 dt.cutoff=dt.min+2*7*52.25
 wh=which(donation.simple$date0<dt.cutoff)
 exclude.donors=unique(donation.simple$numid[wh])
@@ -438,6 +440,7 @@ repeat.counts = donation.simple %>%
 
 #####
 dt.max=max(donation.simple$date)
+param$dt.max=dt.max
 
 dlink = donation.simple %>%
 	left_join(donation.simple[,c('numid','ord','date')],join_by(numid,x$ord.next==y$ord)) %>%
@@ -524,31 +527,6 @@ bsAssign = function(name) {
 	assign(name,obj,.GlobalEnv)
 }
 
-dlink$ord.pwr=dlink$ord^(2/3)
-agl=by(dlink,dlink[,'sex'],function(x) {
-		# must parameterise sampling
-		# nb! Should also add timing to the script
-		wh=sample(1:nrow(x),100000)
-		m=coxph(Surv(diff,event)~ord.pwr+age.group.t,data=x[wh,])
-		sm=summary(m)
-		df=data.frame(sm$coeff)
-
-		var='age.group.t'
-		level=1
-		df=cbind(var=var,level=level,ord=as.integer(c(NA,grep(var,rownames(df)))),df)
-		colnames(df)=c('var','level','ord.group','coef','exp.coef','se.coef','z','p.value')
-		df$breaks=paste(levels(x$age.group.t),collapse=';')
-
-		rdf=cbind(sex=x$sex[1],df,sm$conf.int)
-		colnames(rdf)=sub(' \\.','..',colnames(rdf))
-
-		rdf$ord.group=as.integer(rdf$ord.group)
-		colnames(rdf)=sub('^ord.group$','ord',colnames(rdf)) # $ord.group=NULL
-
-		return(rdf[,!grepl('\\(',colnames(rdf))])
-	})
-res.models.age.t=do.call(rbind,agl)
-
 # interesting results: those with 'more hb tend to donate less frequently
 # Is it actually the case that the most active donors get their hb depleted
 # nb! This must be done 
@@ -600,7 +578,6 @@ getResults=function(dlink,spec,replace.ord.group=NULL) {
 
 res.models=getResults(dlink,spec)
 res.curves=getResults(dlink,spec.curves)
-res.models.age.t=getResults(dlink,spec.age.t,'age.group.t')
 
 ### estimate a model with all the ord-levels as a factor
 # separately for sex
@@ -650,7 +627,7 @@ flist=by(dlink.sampled,dlink.sampled$sex,function(x) {
 	})
 res.models.full=do.call(rbind,flist)
 
-res.models.all=rbind(res.models,res.models.age.t,res.models.full)
+res.models.all=rbind(res.models,res.models.full)
 
 # writing the results: export
 cbs=100000 # curve.batch.size # nb! could be a parameter
