@@ -481,6 +481,7 @@ print(paste(hb.var,sex0,data0$ord.group[1]))
 		breaks.ord=quantile(data,prob=c(0,0.1,0.25,0.75,0.9,1),names=FALSE,na.rm=TRUE)
 		breaks.str=df.breaks %>% filter(sex==sex0,var==hb.var) %>% dplyr::select(breaks) %>% as.character()
 		breaks.common=strsplit(breaks.str,',')[[1]]
+		print(breaks.common)
 		data=cut(data,breaks.common)
 		levels(data)=c('bottom 10%','bottom 10-25%','mid','top 10-25%','top 10%')
 		data=relevel(data,ref='mid')
@@ -662,3 +663,4 @@ sapply(curve.batches,FUN=function(x) {
 		return(c(row.0,row.1))
 
 	})
+
