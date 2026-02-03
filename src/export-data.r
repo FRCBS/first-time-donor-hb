@@ -467,6 +467,8 @@ dlink$dummy=NULL
 ###
 
 do.coxph.inner = function(data0) {
+data00=data0
+bsAssign('data00')
 	hb.var=colnames(data0)[ncol(data0)]
 	sex0=data0$sex[1]
 
@@ -658,4 +660,5 @@ sapply(curve.batches,FUN=function(x) {
 		row.1=min((x*cbs),nrow(res.curves))
 		write.xlsx(list(curves=res.curves[row.0:row.1,]),file=sub('\\.xlsx',paste0('-survival-',x,'.xlsx'),param$result.file),rowNames=FALSE)
 		return(c(row.0,row.1))
+
 	})
