@@ -470,6 +470,8 @@ do.coxph.inner = function(data0) {
 	hb.var=colnames(data0)[ncol(data0)]
 	sex0=data0$sex[1]
 
+print(paste(hb.var,sex0,data0$ord.group[1]))
+
 	breaks.str='-'
 
 	data=data0[[hb.var]]
@@ -501,8 +503,8 @@ do.coxph.inner = function(data0) {
 			dplyr::select(-ord.group,-sex)
 	}
 
-	frml.char=paste0('Surv(diff,event)~.')
-	m=coxph(formula(frml.char),data=data0)
+bsAssign('data0')
+	m=coxph(Surv(diff,event)~.,data=data0)
 
 	if (ncol(data0)==2) {
 		# The case where survfit are extracted; spec ~ '-'. Will just return the survival curves
