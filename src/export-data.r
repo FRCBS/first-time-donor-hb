@@ -547,7 +547,7 @@ spec.age.t=data.frame(hb.var='age.group.t')
 # compute the breaks used to group hb-variables in the cox regressions
 res.breaks=lapply(hb.vars,function(x) {
 		min.x=min(dlink[!is.na(dlink[[x]]),'ord']) # 1 or 2
-		data.br=dlink[dlink$ord==min.x,c('sex',x)]
+		data.br=dlink[dlink$ord==min.x&!is.na(dlink[[x]]),c('sex',x)]
 		br.list=lapply(c('Male','Female'),function(y) {
 				brs=quantile(data.br[data.br$sex==y,x],prob=c(0,0.1,0.25,0.75,0.9,1),names=FALSE,na.rm=TRUE)
 				data.frame(var=x,sex=y,breaks=paste(brs,collapse=','))
@@ -663,4 +663,5 @@ sapply(curve.batches,FUN=function(x) {
 		return(c(row.0,row.1))
 
 	})
+
 
