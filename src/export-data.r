@@ -468,8 +468,12 @@ dlink$dummy=NULL
 ###
 
 do.coxph.inner = function(data0) {
+data00=data0
+bsAssign('data00')
 	hb.var=colnames(data0)[ncol(data0)]
 	sex0=data0$sex[1]
+
+print(paste(hb.var,sex0,data0$ord.group[1]))
 
 	breaks.str='-'
 
@@ -478,6 +482,7 @@ do.coxph.inner = function(data0) {
 		breaks.ord=quantile(data,prob=c(0,0.1,0.25,0.75,0.9,1),names=FALSE,na.rm=TRUE)
 		breaks.str=df.breaks %>% filter(sex==sex0,var==hb.var) %>% dplyr::select(breaks) %>% as.character()
 		breaks.common=strsplit(breaks.str,',')[[1]]
+		print(breaks.common)
 		data=cut(data,breaks.common)
 		levels(data)=c('bottom 10%','bottom 10-25%','mid','top 10-25%','top 10%')
 		data=relevel(data,ref='mid')
@@ -502,8 +507,8 @@ do.coxph.inner = function(data0) {
 			dplyr::select(-ord.group,-sex)
 	}
 
-	frml.char=paste0('Surv(diff,event)~.')
-	m=coxph(formula(frml.char),data=data0)
+bsAssign('data0')
+	m=coxph(Surv(diff,event)~.,data=data0)
 
 	if (ncol(data0)==2) {
 		# The case where survfit are extracted; spec ~ '-'. Will just return the survival curves
@@ -657,4 +662,6 @@ sapply(curve.batches,FUN=function(x) {
 		row.1=min((x*cbs),nrow(res.curves))
 		write.xlsx(list(curves=res.curves[row.0:row.1,]),file=sub('\\.xlsx',paste0('-survival-',x,'.xlsx'),param$result.file),rowNames=FALSE)
 		return(c(row.0,row.1))
+
 	})
+
