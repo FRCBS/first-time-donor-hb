@@ -44,7 +44,8 @@ param$hb.maximum = Inf
 # This is the default file location. If you are using a country-specific file
 # name or path, please specify it below under country-specific parameters.
 # nb! If donationdata is already available in memory, the following line need not be run.
-param$data.file = file.path(param$wd,'donationdata.Rdata')
+# param$data.file = file.path(param$wd,'donationdata.Rdata')
+param$data.file = file.path("~/data/donationdata_only_vb.Rdata")
 
 # The number of intended decimals in Hb values
 # Typically 0 for g/L, 1 for g/dL and mmol/L
