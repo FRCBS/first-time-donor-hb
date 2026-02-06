@@ -26,7 +26,7 @@ dir.create(file.path(param$wd,"log"),showWarnings = FALSE)
 param$result.file = file.path(param$wd,"results","exported-data.xlsx")
 
 # nb! Please edit your country code below
-param$country = 'FI'
+param$country = 'NL'
 
 param$omit.data=list()
 param$max.ord.group.number=15
