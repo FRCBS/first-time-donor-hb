@@ -44,8 +44,7 @@ param$hb.maximum = Inf
 # This is the default file location. If you are using a country-specific file
 # name or path, please specify it below under country-specific parameters.
 # nb! If donationdata is already available in memory, the following line need not be run.
-# param$data.file = file.path(param$wd,'donationdata.Rdata')
-param$data.file = file.path("~/data/donationdata_only_vb.Rdata")
+param$data.file = file.path(param$wd,'donationdata.Rdata')
 
 # The number of intended decimals in Hb values
 # Typically 0 for g/L, 1 for g/dL and mmol/L
@@ -154,6 +153,15 @@ donationdata$donation$rowid=1e7+1:nrow(donationdata$donation) #as.integer(rownam
 donationdata$donor$rowid=2e5+1:nrow(donationdata$donor) # as.integer(rownames(donationdata$donor))
 
 donationdata$donation$DonationPlaceType[is.na(donationdata$donation$DonationPlaceType)]='Office'
+
+# Set anything out of bounds in Hb to NA. NL specific add. And remove Sex==""
+donationdata$donation <- donationdata$donation %>% 
+  mutate(Hb=ifelse(Hb < param$hb.minimum | Hb > param$hb.maximum, NA, Hb))
+donationdata$donation <- donationdata$donation %>% filter(Sex %in% c('Female','Male')) 
+donationdata$donor <- donationdata$donor %>% filter(Sex %in% c('Female','Male')) 
+
+
+
 for (nm in names(param$omit.data)) {
 	donationdata$donation=donationdata$donation %>%
 		filter(as.character(!!!syms(nm))!=param$omit.data[[nm]])
@@ -196,7 +204,7 @@ simple <- simple %>% filter(!is.na(Sex))
 #The filter(param$country != NL || BloodDonationTypeKey == "New") gave an error for me so changed to this
 if (param$country == "NL") {
   date0 = simple %>%
-    filter(BloodDonationTypeKey == "New") %>%
+    # filter(BloodDonationTypeKey == "New") %>%
     group_by(releaseID) %>%
     summarise(date0=min(DonationDate),.groups='drop')
   } else {
@@ -548,8 +556,8 @@ spec.age.t=data.frame(hb.var='age.group.t')
 # compute the breaks used to group hb-variables in the cox regressions
 res.breaks=lapply(hb.vars,function(x) {
 		min.x=min(dlink[!is.na(dlink[[x]]),'ord']) # 1 or 2
-		data.br=dlink[dlink$ord==min.x,c('sex',x)]
-		br.list=lapply(c('Male','Female'),function(y) {
+		data.br=dlink[dlink$ord==min.x&!is.na(dlink[[x]]),c('sex',x)]
+		br.list=lapply(unique(dlink$sex),function(y) {
 				brs=quantile(data.br[data.br$sex==y,x],prob=c(0,0.1,0.25,0.75,0.9,1),names=FALSE,na.rm=TRUE)
 				data.frame(var=x,sex=y,breaks=paste(brs,collapse=','))
 			})
@@ -664,4 +672,5 @@ sapply(curve.batches,FUN=function(x) {
 		return(c(row.0,row.1))
 
 	})
+
 
