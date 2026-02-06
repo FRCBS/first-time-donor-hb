@@ -660,7 +660,8 @@ bsFlatten = function(x) {
 		}
 	
 		data.frame(name=x,value=param[[x]])
-	}
+}
+param$omit.data='dummy'
 tst=lapply(names(param),bsFlatten)
 df.param=do.call(rbind,tst)
 
