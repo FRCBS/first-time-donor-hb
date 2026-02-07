@@ -1,5 +1,3 @@
-## ----load-packages------------
-# install.packages('moments')
 library(dplyr)
 library(lubridate)
 library(tidyr)
@@ -667,5 +665,4 @@ sapply(curve.batches,FUN=function(x) {
 		return(c(row.0,row.1))
 
 	})
-
 
