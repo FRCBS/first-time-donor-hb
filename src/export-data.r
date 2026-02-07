@@ -189,7 +189,7 @@ simple <- simple %>% filter(!is.na(Sex))
 #The filter(param$country != NL || BloodDonationTypeKey == "New") gave an error for me so changed to this
 if (param$country == "NL") {
   date0 = simple %>%
-    filter(BloodDonationTypeKey == "New") %>%
+    # filter(BloodDonationTypeKey == "New") %>%
     group_by(releaseID) %>%
     summarise(date0=min(DonationDate),.groups='drop')
   } else {
@@ -337,6 +337,33 @@ donation.simple = donationdata$donation[, c('rowid','numid',"BloodDonationTypeKe
   left_join(donationdata$donor[,c('numid',param$donor.cols)],join_by(numid)) %>%
   arrange(numid,DonationDate) %>%
   dplyr::select(-BloodDonationTypeKey)
+
+# 2026-02-07
+for (cn in c('hb','sex','date')) {
+      wh=which(is.na(donation.simple[[cn]]))
+      if (length(wh) > 0) {
+            donation.simple=donation.simple[-wh,]
+      }
+      param[[paste0('na.lines.',cn)]]=length(wh)
+}
+
+wh=which(donation.simple$hb<0)
+if (length(wh) > 0) {
+      donation.simple=donation.simple[-wh,]
+}
+param$omit.hb.low=length(wh)
+
+wh=which(donation.simple$hb>3*param$cutoff.female)
+if (length(wh) > 0) {
+      donation.simple=donation.simple[-wh,]
+}
+param$omit.hb.high=length(wh)
+
+wh=which(!donation.simple$Sex %in% c('Female','Male'))
+if (length(wh) > 0) {
+      donation.simple=donation.simple[-wh,]
+}
+param$omit.empty.or.other.sex=length(wh)
 
 donation.simple = donation.simple %>% 
 	group_by(numid) %>%
@@ -497,8 +524,6 @@ print(paste(hb.var,sex0,data0$ord.group[1]))
 	og0=data0$ord.group[1]
 
 	if (hb.var=='sex') {
-#error(11)
-#data0=data00
 		wh=which(colnames(data0)=='sex')
 		data0=data0[,-wh[1]]
 		data0 = data0 %>%
@@ -577,7 +602,7 @@ getResults=function(dlink,spec,replace.ord.group=NULL) {
 		res=do.call(rbind,coeff.list)
 		res$ord.group=as.integer(res$ord.group)
 		colnames(res)=sub('^ord.group$','ord',colnames(res))
-		return(res)c
+		return(res)
 	})
 
 	return(do.call(rbind,res))
@@ -654,6 +679,10 @@ bsFlatten = function(x) {
 	
 		data.frame(name=x,value=param[[x]])
 	}
+
+if (!'omit.data' %in% names(param) || is.null(param$omit.data)) {
+	param$omit.data='none defined'
+}
 tst=lapply(names(param),bsFlatten)
 df.param=do.call(rbind,tst)
 
@@ -665,4 +694,3 @@ sapply(curve.batches,FUN=function(x) {
 		return(c(row.0,row.1))
 
 	})
-
