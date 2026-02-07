@@ -1,7 +1,3 @@
-## ----setup, include=FALSE-----
-knitr::opts_chunk$set(echo = TRUE)
-
-
 ## ----load-packages------------
 # install.packages('moments')
 library(dplyr)
@@ -470,7 +466,13 @@ do.coxph.inner = function(data0) {
 data00=data0
 bsAssign('data00')
 	hb.var=colnames(data0)[ncol(data0)]
-	sex0=data0$sex[1]
+
+	if(hb.var != 'sex') {
+		sex0=data0$sex[1] 
+	} else {
+		sex0='Female'
+	}
+	
 
 print(paste(hb.var,sex0,data0$ord.group[1]))
 
@@ -497,10 +499,13 @@ print(paste(hb.var,sex0,data0$ord.group[1]))
 	og0=data0$ord.group[1]
 
 	if (hb.var=='sex') {
+#error(11)
+#data0=data00
 		wh=which(colnames(data0)=='sex')
 		data0=data0[,-wh[1]]
 		data0 = data0 %>%
 			dplyr::select(-ord.group)
+		data0$sex=relevel(as.factor(data0$sex),ref='Female')
 	} else {
 		data0 = data0 %>%
 			dplyr::select(-ord.group,-sex)
@@ -537,7 +542,6 @@ bsAssign = function(name) {
 # nb! This must be done 
 vars = c('sex','avg.diff','hb.surplus','hb.change','age.group','bloodgr','age.group.t')
 hb.vars = c('avg.diff','hb.surplus','hb.change')
-# spec=expand.grid(grp.var=c(NA,'sex'),hb.var=vars)
 cols.prefix=c('diff','event','sex','ord.group')
 
 spec=data.frame(hb.var=vars)
@@ -575,7 +579,7 @@ getResults=function(dlink,spec,replace.ord.group=NULL) {
 		res=do.call(rbind,coeff.list)
 		res$ord.group=as.integer(res$ord.group)
 		colnames(res)=sub('^ord.group$','ord',colnames(res))
-		return(res)
+		return(res)c
 	})
 
 	return(do.call(rbind,res))
