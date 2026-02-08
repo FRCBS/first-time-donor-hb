@@ -393,7 +393,7 @@ getIntervals = function(breaks) {
 	return(c(lower,mid.bits[-2],upper))
 }
 
-y=res.models.all %>% filter(sex=='Female',var=='ord.group.full')
+# y=res.models.all %>% filter(sex=='Female',var=='ord.group.full')
 
 pdf('results/survival-figures.pdf')
 by(res.models.all,res.models.all[,c('sex','var')],function(y) {

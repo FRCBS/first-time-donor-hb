@@ -331,37 +331,42 @@ for (nm in names(param$omit.data)) {
 # new variant adapted from the new export-data.file
 donation.simple = donationdata$donation[, c('rowid','numid',"BloodDonationTypeKey", "DonationDate", 
                   "Hb", param$donation.cols)] %>% #  "DonationPlaceType","DonationPlaceCode"
-  filter(TRUE || !is.na(Hb)) %>% # param$include.na # nb! must check again
+  filter(param$include.na || !is.na(Hb)) %>% #  # nb! must check again
   filter(BloodDonationTypeKey %in% param$donation.type.keys.survival) %>%
   # VisitNoDonation is used in Finland during the recent years instead of No Donation (E)
   left_join(donationdata$donor[,c('numid',param$donor.cols)],join_by(numid)) %>%
   arrange(numid,DonationDate) %>%
   dplyr::select(-BloodDonationTypeKey)
 
+# 2026-02-07 na-test-code
+wh.hb.na.test=sample(1:nrow(donation.simple),1000)
+donation.simple$Hb[wh.hb.na.test]=rep(NA,1000)
+
+cn='Hb'
 # 2026-02-07
-for (cn in c('hb','sex','date')) {
-      wh=which(is.na(donation.simple[[cn]]))
-      if (length(wh) > 0) {
-            donation.simple=donation.simple[-wh,]
-      }
-      param[[paste0('na.lines.',cn)]]=length(wh)
+for (cn in c('Hb','Sex','DonationDate')) {
+	wh=which(is.na(donation.simple[[cn]]))
+	if (length(wh) > 0) {
+		donation.simple=donation.simple[-wh,]
+	}
+	param[[paste0('na.lines.',cn)]]=length(wh)
 }
 
-wh=which(donation.simple$hb<0)
+wh=which(!is.na(donation.simple$Hb)&donation.simple$Hb<param$hb.minimum)
 if (length(wh) > 0) {
-      donation.simple=donation.simple[-wh,]
+	donation.simple=donation.simple[-wh,]
 }
 param$omit.hb.low=length(wh)
 
-wh=which(donation.simple$hb>3*param$cutoff.female)
+wh=which(!is.na(donation.simple$Hb)&donation.simple$Hb>param$hb.maximum)
 if (length(wh) > 0) {
-      donation.simple=donation.simple[-wh,]
+	donation.simple=donation.simple[-wh,]
 }
 param$omit.hb.high=length(wh)
 
 wh=which(!donation.simple$Sex %in% c('Female','Male'))
 if (length(wh) > 0) {
-      donation.simple=donation.simple[-wh,]
+	donation.simple=donation.simple[-wh,]
 }
 param$omit.empty.or.other.sex=length(wh)
 
