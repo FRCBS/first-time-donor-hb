@@ -208,7 +208,7 @@ dd.sorted=dist.diff %>% arrange(diff)
 
 # names(countries$fi)
 getwd()
-pdf('../results/margins.pdf')
+pdf('results/margins.pdf')
 mar.res=list()
 for (nm in names(margins)) {
 	print(paste('****',nm))
@@ -232,6 +232,11 @@ for (nm in names(margins)) {
 		})
 	var.data=do.call(rbind,rlist)
 
+	for (cn in names(conversions)) {
+		convert.cols=c('Estimate','Std..Error','lower','upper')
+		var.data[var.data$country==cn,convert.cols]= conversions[[cn]]*var.data[var.data$country==cn,convert.cols]
+	}
+
 	pp.cols=list(Male='blue3',Female='red3')
 	xmin=min(var.data$level[var.data$level>=0])-1
 	plot(x=NULL,xlim=c(xmin,max(var.data$level)),ylim=c(min(var.data$lower),max(var.data$upper)),
@@ -240,17 +245,19 @@ for (nm in names(margins)) {
 			sex0=x$sex[1]
 			country0=x$country[1]
 
-			col0=pp.cols[[sex0]]
+			# col0=pp.cols[[sex0]]
+			col0=colours[[country0]]
 
 			wh = which(x$level==-1)
 			if (length(wh) > 0) {
 				x0=min(x$level[-wh])-1+0.1*if(sex0=='Male') 0.2 else 0
-				arrows(x0,x$lower[wh],x0,x$Estimate[wh],length=0.05,angle=90,code=3,col=col0,lwd=1.5)
-				arrows(x0,x$Estimate[wh],x0,x$upper[wh],length=0.05,angle=90,code=3,col=col0,lwd=1.5)
+				arrows(x0,x$lower[wh],x0,x$Estimate[wh],length=0.05,angle=90,code=1,col=col0,lwd=1.5)
+				arrows(x0,x$Estimate[wh],x0,x$upper[wh],length=0.05,angle=90,code=2,col=col0,lwd=1.5)
+				points(x0,x$Estimate[wh],pch=pchs[[sex0]],col=col0)
 				x=x[-wh,]
 			}
 
-			lines(x$level,x$Estimate,col=col0,lwd=2)
+			lines(x$level,x$Estimate,col=col0,lwd=2,lty=ltys[[sex0]])
 			lines(x$level,x$upper,col=col0,lwd=1,lty='dashed')
 			lines(x$level,x$lower,col=col0,lwd=1,lty='dashed')
 		})
@@ -303,7 +310,10 @@ hb.cmp=inner_join(crtn.annual,hb.dummy,join_by(data.set,sex,country,year,)) %>%
 	rbind(hb.dummy) %>%
 	dplyr::filter(year>=2002,year<2024) # 2026-02-08 nb! must filter each country based on their own years
 # nb! must do the conversion properly as well
-hb.cmp$hb[grepl('nl',hb.cmp$country)]= (10 / 0.6206)*hb.cmp$hb[grepl('nl',hb.cmp$country)]
+
+for (nm in names(conversions) {
+	hb.cmp$hb[grepl(nm,hb.cmp$country)]= conversions[[nm]]*hb.cmp$hb[grepl(nm,hb.cmp$country)]
+}
 
 pdf('results/trends-corrected.pdf')
 plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=colours,colour.col='country')
