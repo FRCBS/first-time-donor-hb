@@ -1,27 +1,17 @@
 file.paths = sub('\\.xlsx','-hb.xlsx',param$result.file) # paste(param$data.dir,file.names,sep='')
 plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c('Estimate','lower','upper'),
-		ltys=list(cm='dashed',fi='solid'),colours=list(Male='blue3',Female='red3'),main='',colour.col='sex') {
+		ltys=list(cm='dashed',fi='solid'),colours=list(Male='blue3',Female='red3'),main='') {
 
 	xmin=min(data[[xcol]][data[[xcol]]>=0])-1
 	ylim=c(min(data[,ycols]),max(data[,ycols]))
 	yspan=(ylim[2]-ylim[1])
 	plot(x=NULL,xlim=c(xmin,max(data[[xcol]])),ylim=c(ylim[1]-0.5*yspan,ylim[2]),
-		main=if(main!='') main else '',xlab=xcol,ylab=ycols[1])
-	lgnd=by(data,data[,group.cols[!is.na(group.cols)]],function(x) {
+		main=main,xlab=xcol,ylab=ycols[1])
+	lgnd=by(data,data[,group.cols],function(x) {
 			sex0=x[1,group.cols[1]] 
 			country0=x[1,group.cols[2]] 
 
-			if (grepl('-corrected',country0)) {
-				country0=sub('-.+$','',country0)
-				ltys[[country0]]='dashed'
-			}
-
-			col0=NA
-			if (!is.null(sex0) && !is.na(sex0) && colour.col=='sex') {
-				col0=pp.cols[[sex0]]
-			} else {
-				col0=colours[[country0]]
-			}
+			col0=pp.cols[[sex0]]
 
 			wh = which(x[[xcol]]==-1)
 			if (length(wh) > 0) {
@@ -37,8 +27,8 @@ plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c(
 				ltys[[country0]]='solid'
 
 			lines(x[[xcol]],x[[ycols[1]]],col=col0,lwd=2,lty=ltys[[country0]])
-			lines(x[[xcol]],x[[ycols[3]]],col=col0,lwd=1,lty='dotted')
-			lines(x[[xcol]],x[[ycols[2]]],col=col0,lwd=1,lty='dotted')
+			lines(x[[xcol]],x[[ycols[3]]],col=col0,lwd=1,lty='dashed')
+			lines(x[[xcol]],x[[ycols[2]]],col=col0,lwd=1,lty='dashed')
 
 			sm=summary(m)
 			cf=round(sm$coeff,3)
@@ -382,7 +372,7 @@ colours[['(40,100]']]='gray3'
 colours[['O-']]='blue3'
 colours[['general']]='black'
 
-lvs=unique(res.models$level[res.models$var=='age.group.t']) # levels(dlink$age.group.t)
+lvs=levels(dlink$age.group.t)
 palette=colorRampPalette(c("blue4", "white"))(length(lvs)+3)
 
 library(RColorBrewer)
@@ -403,12 +393,10 @@ getIntervals = function(breaks) {
 	return(c(lower,mid.bits[-2],upper))
 }
 
-# y=res.models.all %>% filter(sex=='Female',var=='ord.group.full')
-
-res.models %>% filter(var=='sex') %>% arrange(country,sex)
+y=res.models.all %>% filter(sex=='Female',var=='ord.group.full')
 
 pdf('results/survival-figures.pdf')
-by(res.models,res.models[,c('sex','var')],function(y) {
+by(res.models.all,res.models.all[,c('sex','var')],function(y) {
 	if (length(unique(y$level))==1)
 		y$level='general'
 
@@ -435,7 +423,7 @@ by(res.models,res.models[,c('sex','var')],function(y) {
 		abline(v=max(y$ord)-0.5,lwd=1,lty='dashed')
 
 	brk.labels=if (breaks!='-') getIntervals(breaks) else ''
-	levels=(unique(y$level))
+	levels=rev(unique(y$level))
 	if (length(levels) > 1) {
 		fill=sapply(levels,col.fun)
 		levels=levels[fill!='white']
@@ -457,7 +445,7 @@ by(res.models,res.models[,c('sex','var')],function(y) {
 dev.off()
 
 pdf('results/survival-curves.pdf')
-dummy=by(res.curves,res.curves[,c('ord','sex')],function(df) {
+dummy=by(res.curves,res.curves[,c('sex','ord')],function(df) {
 		wh=min(which(df$surv<0.99))
 		len0=length(df$surv)
 		df=df[wh:len0,]
