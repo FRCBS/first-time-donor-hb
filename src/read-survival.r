@@ -30,8 +30,8 @@ file.names = file.names[grepl('.xlsx$',file.names)]
 file.paths = paste(param$data.dir,file.names,sep='')
 
 # Should be moved to a common functions file; now coexists in both read-* files
-plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c('Estimate','lower','upper'),
-		ltys=list(cm='dashed',fi='solid'),colours=list(Male='blue3',Female='red3'),main='') {
+plotByGroups.obsolete = function(data,group.cols=c('sex','country'),xcol='level',ycols=c('Estimate','lower','upper'),
+		ltys=list(cm='dashed',fi='solid',nl='solid'),colours=list(Male='blue3',Female='red3'),main='') {
 
 	xmin=min(data[[xcol]][data[[xcol]]>=0])-1
 	ylim=c(min(data[,ycols]),max(data[,ycols]))
@@ -64,6 +64,7 @@ plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c(
 			text=paste0('b=',sprintf(cf[2,1],fmt='%.3f'),', p=',cf[2,4])
 			data.frame(text=paste(text,country0),b=cf[2,1],p=cf[2,4],lty=ltys[[country0]],col=col0)
 		})
+
 	# bsAssign('lgnd')
 	# legend=paste(lgnd)
 	legend.data=do.call(rbind,lgnd)
@@ -72,6 +73,7 @@ plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c(
 
 countries = list()
 for (file in file.paths) {
+print(file)
 	identifier = sub('.+[/\\]([a-z]+)[^/\\]+$','\\1',file) # gsub('.*\\\\(..).*\\.xlsx$','\\1',file)
 	if (nchar(identifier) > 2) 
 		next
@@ -80,21 +82,40 @@ for (file in file.paths) {
 	
 	sheet.names = getSheetNames(file)
 	for (sn in sheet.names) {
+print(sn)
 		data = read.xlsx(file,colNames=TRUE,rowNames=FALSE,sheet = sn)
 		if (sn == 'parameters') {
 			curr$parameters=data
 		} else {
-			curr[[sn]]=cbind(country=identifier,data)
+			new.sheet=cbind(country=identifier,data)
+			curr[[sn]]=new.sheet
 		}
 	}
-	
-	countries[[identifier]] = curr
+
+	if (!identifier %in% names(countries)) {
+		countries[[identifier]]=curr
+	} else  {
+		for (tn2 in names(curr)) {
+			if (tn2 %in% names(countries[[identifier]])) {
+				countries[[identifier]][[tn2]]=rbind(countries[[identifier]][[tn2]],curr[[tn2]])
+			} else {
+				countries[[identifier]][[tn2]]=curr[[tn2]]
+			}
+		}
+	}
 }
 
-str(countries$fi)
+str(countries[[identifier]])
+str(curr[[tn2]])
 
-res.models=countries$fi$models
-res.curves=countries$fi$curves
+dim(countries$fi$curves)
+str(countries$nl)
+
+dim(res.curves)
+res.models=do.call(rbind,lapply(names(countries),function(x) countries[[x]]$models))
+res.curves=do.call(rbind,lapply(names(countries),function(x) countries[[x]]$curves))
+# res.models=countries$nl$models
+# res.curves=countries$nl$curves
 
 # res.models$ord=(as.integer(res.models$ord.group))
 # res.curves$ord=(as.integer(res.curves$ord.group))
@@ -107,3 +128,5 @@ if (grepl('[/\\]src[/\\]?',param$wd)) {
    param$wd = sub('[/\\]src([/\\]?)$','\\1',param$wd)
 }
 setwd(param$wd)
+
+param$max.ord.group.number=15

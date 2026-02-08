@@ -1,8 +1,5 @@
 setwd('c:/hy-version/first-time-donor-hb/src')
 
-# %%% read anonymous data files
-## ----setup, include=FALSE,echo=FALSE------------------------------------------
-# knitr::opts_chunk$set(echo = FALSE,warning=FALSE)
 library(tidyverse)
 library(openxlsx)
 
@@ -29,7 +26,7 @@ file.names = file.names[!grepl('survival',file.names)]
 file.names = file.names[grepl('.xlsx$',file.names)]
 file.paths = paste(param$data.dir,file.names,sep='')
 
-plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c('Estimate','lower','upper'),
+plotByGroups.old = function(data,group.cols=c('sex','country'),xcol='level',ycols=c('Estimate','lower','upper'),
 		ltys=list(cm='dashed',fi='solid'),colours=list(Male='blue3',Female='red3'),main='') {
 
 	xmin=min(data[[xcol]][data[[xcol]]>=0])-1
@@ -301,18 +298,17 @@ hb.dummy=annual.hb %>%
 plotByGroups(hb.dummy,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=list(Male='blue3',Female='red3'))
 
 hb.cmp=inner_join(crtn.annual,hb.dummy,join_by(data.set,sex,country,year,)) %>%
-	mutate(hb=hb+correction,country='cm') %>%
+	mutate(hb=hb+correction,country=paste0(country,'-corrected')) %>%
 	select(!!!syms(colnames(hb.dummy))) %>%
 	rbind(hb.dummy) %>%
-	dplyr::filter(year>=2002,year<2024)
+	dplyr::filter(year>=2002,year<2024) # 2026-02-08 nb! must filter each country based on their own years
+# nb! must do the conversion properly as well
+hb.cmp$hb[grepl('nl',hb.cmp$country)]= (10 / 0.6206)*hb.cmp$hb[grepl('nl',hb.cmp$country)]
 
-table(hb.cmp$year)
-
-pdf('../results/trends-corrected.pdf')
-plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=list(Male='blue3',Female='red3'),ltys=list(cm='dashed',fi='solid'))
+pdf('results/trends-corrected.pdf')
+plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=colours,colour.col='country')
+# plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=list(Male='blue3',Female='red3'),ltys=list(fi='solid'))
 dev.off()
-# plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=list(Male='blue3',Female='red3'),ltys=list(cm='dashed',fi='solid'))
-
 ### eof
 
 colours=list()
