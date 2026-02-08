@@ -1,7 +1,6 @@
-setwd('c:/hy-version/first-time-donor-hb/src')
+setwd('c:/hy-version/first-time-donor-hb')
 
-library(tidyverse)
-library(openxlsx)
+source('src/analysis-functions.r')
 
 ## ----parameters,echo=FALSE----------------------------------------------------
 param=list()
@@ -201,13 +200,7 @@ lines(yd0$level,yd0$prop,col='red3',lwd=3)
 
 dist.diff=inner_join(dist.year,dist,join_by(country,data.set,sex,var,level),suffix=c('','0')) %>%
 	mutate(diff=prop-prop0)
-# hist(dist.diff$prop-dist.diff$prop0)
 
-dd.sorted=dist.diff %>% arrange(diff)
-# plot(dd.sorted$diff)
-
-# names(countries$fi)
-getwd()
 pdf('results/margins.pdf')
 mar.res=list()
 for (nm in names(margins)) {
@@ -273,8 +266,6 @@ crtn$level=as.character(crtn$level)
 # crtn contains the deviances per margin (mean-hb) estimated from data usin lm
 # next compute the corrections per margin: difference in proportion (dist.diff$prop) times the crtn
 # the computed corrections will be added (+) to the means
-# str(crtn)
-# str(dist.diff)
 
 # e.g. 20% donations in January in 2023 vs. 10% on average -> diff=10%
 # It was estimated that hb is -1 below average in January: Estimate=-1
@@ -287,21 +278,21 @@ crtn.mean=inner_join(dist.diff[dist.diff$data.set=='donation0',],crtn,join_by(co
 	dplyr::select(country,data.set,sex,var,level,year,correction) %>%
 	arrange(correction)
 
-str(crtn.mean)
-plot(crtn.mean$correction)
-summary(crtn.mean)
-crtn.mean # abs(min~man)=0.37: näihin ei siis tosiaankaan tikahdu
-crtn.mean[1:10,]
-
 crtn.annual=crtn.mean %>%
 	group_by(country,data.set,sex,year) %>%
 	summarise(correction=sum(correction),.groups='drop') %>%
 	data.frame()
 plot(crtn.annual$correction)
 
+conversions.df=data.frame(t(data.frame(conversions)))
+colnames(conversions.df)='rate'
+conversions.df$country=rownames(conversions.df)
+
 plotByGroups(crtn.annual,group.cols=c('sex','country'),xcol='year',ycols=c('correction'),colours=list(Male='blue3',Female='red3'))
 hb.dummy=annual.hb %>%
-	filter(data.set=='donation0')
+	filter(data.set=='donation0') %>%
+	inner_join(conversions.df,join_by(country)) %>%
+	mutate(hb=rate*hb)
 plotByGroups(hb.dummy,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=list(Male='blue3',Female='red3'))
 
 hb.cmp=inner_join(crtn.annual,hb.dummy,join_by(data.set,sex,country,year,)) %>%
@@ -311,76 +302,10 @@ hb.cmp=inner_join(crtn.annual,hb.dummy,join_by(data.set,sex,country,year,)) %>%
 	dplyr::filter(year>=2002,year<2024) # 2026-02-08 nb! must filter each country based on their own years
 # nb! must do the conversion properly as well
 
-for (nm in names(conversions) {
-	hb.cmp$hb[grepl(nm,hb.cmp$country)]= conversions[[nm]]*hb.cmp$hb[grepl(nm,hb.cmp$country)]
-}
+# for (nm in names(conversions)) {
+#	hb.cmp$hb[grepl(nm,hb.cmp$country)]= conversions[[nm]]*hb.cmp$hb[grepl(nm,hb.cmp$country)]
+# }
 
 pdf('results/trends-corrected.pdf')
 plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=colours,colour.col='country')
-# plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=list(Male='blue3',Female='red3'),ltys=list(fi='solid'))
 dev.off()
-### eof
-
-colours=list()
-colours$fi='darkblue'
-colours$nl='orange'
-colours$fr='red3'
-colours$au='#007F3B' # 'green3'
-colours$nc='black'
-colours$ct='purple'
-colours$za='turquoise3' # 'violetred3'
-
-cn.names=list()
-cn.names$fi='Finland'
-cn.names$nl='Netherlands'
-cn.names$fr='France'
-cn.names$au='Australia'
-cn.names$nc='Navarre'
-cn.names$ct='Catalonia'
-cn.names$za='South Africa'
-
-colfun = function(x) {
-	colours[[x]]
-}
-
-nuisance.cols = c('Multiplier','MaximumAge','Name','avage')
-dim.cols = c('country','age.lower','age.upper','DonationPlaceType','Sex','BloodGroup',nuisance.cols)
-dim.keep = c('country','Sex') # this is the changing part
-
-spec.list = list()
-spec.list$country = list()
-spec.list$country$dim.keep = c('country')
-spec.list$country$pch = function(x) {15}
-spec.list$country$colours = colours
-spec.list$country$col.dim = 'country'
-spec.list$country$pch.dim = 'country'
-
-if (FALSE) {
-	spec.list$Sex = list()
-	spec.list$Sex$dim.keep = c('Sex')
-	spec.list$Sex$pch = function(x) {2}
-	spec.list$Sex$colours = list(Male='blue3',Female='red3')
-	spec.list$Sex$col.dim = 'Sex'
-}
-
-spec.list$country.sex = list()
-spec.list$country.sex$dim.keep = c('country','Sex')
-spec.list$country.sex$pch = function(x) { pchs=list(Female=2,Male=6);  return(pchs[[x]])}
-spec.list$country.sex$colours = colours
-spec.list$country.sex$col.dim = 'country'
-spec.list$country.sex$pch.dim = 'Sex'
-
-spec.list$country.age = list()
-spec.list$country.age$dim.keep = c('country','age.lower')
-spec.list$country.age$pch = function(x) { pchs=list(a0=7,a25=9,a40=12);  return(pchs[[paste0('a',x)]])}
-spec.list$country.age$colours = colours
-spec.list$country.age$col.dim = 'country'
-spec.list$country.age$pch.dim = 'age.lower'
-
-spec.list$country.bloodgr = list()
-spec.list$country.bloodgr$dim.keep = c('country','BloodGroup')
-spec.list$country.bloodgr$pch = function(x) { pchs=list(); pchs[['-O-']]=4; pchs[['O-']]=1;  return(pchs[[x]])}
-spec.list$country.bloodgr$colours = colours
-spec.list$country.bloodgr$col.dim = 'country'
-spec.list$country.bloodgr$pch.dim = 'BloodGroup'
-spec=spec.list$country

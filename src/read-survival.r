@@ -1,4 +1,4 @@
-setwd('c:/hy-version/first-time-donor-hb/src')
+# setwd('c:/hy-version/first-time-donor-hb/src')
 
 library(tidyverse)
 library(openxlsx)
@@ -105,28 +105,16 @@ print(sn)
 	}
 }
 
-str(countries[[identifier]])
-str(curr[[tn2]])
-
-dim(countries$fi$curves)
-str(countries$nl)
-
-dim(res.curves)
 res.models=do.call(rbind,lapply(names(countries),function(x) countries[[x]]$models))
 res.curves=do.call(rbind,lapply(names(countries),function(x) countries[[x]]$curves))
-# res.models=countries$nl$models
-# res.curves=countries$nl$curves
-
-# res.models$ord=(as.integer(res.models$ord.group))
-# res.curves$ord=(as.integer(res.curves$ord.group))
 
 # nb! should check why the column name is wrong in that file
+# this should be corrected now, but leave as is
 colnames(res.curves)=sub('^cur$','sex',colnames(res.curves))
 
 param$wd = getwd()
 if (grepl('[/\\]src[/\\]?',param$wd)) {
    param$wd = sub('[/\\]src([/\\]?)$','\\1',param$wd)
 }
-setwd(param$wd)
 
 param$max.ord.group.number=15
