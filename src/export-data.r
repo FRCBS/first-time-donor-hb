@@ -338,13 +338,8 @@ donation.simple = donationdata$donation[, c('rowid','numid',"BloodDonationTypeKe
   arrange(numid,DonationDate) %>%
   dplyr::select(-BloodDonationTypeKey)
 
-# 2026-02-07 na-test-code
-wh.hb.na.test=sample(1:nrow(donation.simple),1000)
-donation.simple$Hb[wh.hb.na.test]=rep(NA,1000)
-
-cn='Hb'
-# 2026-02-07
-for (cn in c('Hb','Sex','DonationDate')) {
+# 2026-02-07 remove missing values for key variables
+for (cn in c('Sex','DonationDate')) { # 'Hb',
 	wh=which(is.na(donation.simple[[cn]]))
 	if (length(wh) > 0) {
 		donation.simple=donation.simple[-wh,]
