@@ -20,7 +20,7 @@ dir.create(file.path(param$wd,"log"),showWarnings = FALSE)
 param$result.file = file.path(param$wd,"results","exported-data.xlsx")
 
 # nb! Please edit your country code below
-param$country = 'NL'
+param$country = 'NV'
 
 param$omit.data=list()
 param$max.ord.group.number=15
@@ -58,7 +58,8 @@ param$omit.data=list()
 
 # Country-specific parameter settings
 if (param$country == 'NL') {
-  param$data.file = '~/data/data_timo.rdata'
+  # param$data.file = '~/data/data_timo.rdata'
+  param$data.file = '~/data/donor_prediction_data_timo/donationdata_only_vb.Rdata'
   param$units = 'mmol/L' # one of: mmol/L, or g/L or g/dL
   param$cutoff.male = 8.4 # will need to convert these to correct units
   param$cutoff.female = 7.8
@@ -117,14 +118,32 @@ if (param$country == 'NL') {
   }
   param$donor.cols = c('DateOfBirth','Sex','BloodGroup')
   param$donation.cols = c('DonationTimeDTTM')
+} else if (param$country == "NV"){
+  # nb! edit your settings here
+  param$data.file = '~/data/navarra/donationdata.Rdata'
+  param$units = 'g/dL' # one of: mmol/L or g/L or g/dL
+  param$cutoff.male = 13.5 #Not sure!
+  param$cutoff.female = 12.5 #Not sure!
+  param$hb.minimum = 5.0
+  param$hb.maximum = 25.0
+  # MP: Funky hour extraction for NL...
+  param$extractHour = function(simple){ 
+    return(ifelse(is.na(simple$DonationTimeStart), NA_integer_, as.integer(substr(simple$DonationTimeStart, 1, 2))))
+  }
+  param$data.sets = c('donation0','donation.r','simple')
+  param$donor.cols = c('BloodGroup', 'Sex', 'DateOfBirth')
+  param$donation.cols = c('DonationTimeStart')
+  param$hb.decimals = 1
+  # 2026-01-26 For survival analysis, the data should be restricted to successful first-time donations
+  param$donation.type.keys.survival=c("Whole Blood (K)")
 }
 
 # automated reasoning in case param$hb.decimals is not set
 if (is.na(param$hb.decimals)) {
   if (param$units %in% c('mmol/L','g/dL'))
-    hb.decimals = 1
+    param$hb.decimals = 1
   else
-    hb.decimals = 0
+    param$hb.decimals = 0
 }
 
 
@@ -683,6 +702,7 @@ bsFlatten = function(x) {
 if (!'omit.data' %in% names(param) || is.null(param$omit.data)) {
 	param$omit.data='none defined'
 }
+param$omit.data='dummy'
 tst=lapply(names(param),bsFlatten)
 df.param=do.call(rbind,tst)
 
