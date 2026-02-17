@@ -82,7 +82,6 @@ print(file)
 	
 	sheet.names = getSheetNames(file)
 	for (sn in sheet.names) {
-print(sn)
 		data = read.xlsx(file,colNames=TRUE,rowNames=FALSE,sheet = sn)
 		if (sn == 'parameters') {
 			curr$parameters=data

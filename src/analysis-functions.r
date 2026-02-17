@@ -47,7 +47,7 @@ plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c(
 	xmin=min(data[[xcol]][data[[xcol]]>=0])-1
 	ylim=c(min(data[,ycols]),max(data[,ycols]))
 	yspan=(ylim[2]-ylim[1])
-	plot(x=NULL,xlim=c(xmin,max(data[[xcol]])+20),ylim=c(ylim[1],ylim[2]),
+	plot(x=NULL,xlim=c(xmin,max(data[[xcol]])+10),ylim=c(ylim[1],ylim[2]),
 		main=if(main!='') main else '',xlab=xcol,ylab=ycols[1])
 	lgnd=by(data,data[,group.cols[!is.na(group.cols)]],function(x) {
 			sex0=x[1,group.cols[1]] 
@@ -90,7 +90,7 @@ plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c(
 		})
 
 	legend.data=do.call(rbind,lgnd)
-	legend(x='right',legend=sub('cm','corrected',legend.data$text),col=legend.data$col,lty=legend.data$lty,lwd=2)
+	legend(x='bottomright',legend=sub('cm','corrected',legend.data$text),col=legend.data$col,lty=legend.data$lty,lwd=2)
 }
 
 # nb! should use the similar implementation in the previous project to enable easier and more parametric

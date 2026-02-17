@@ -165,7 +165,7 @@ dist.diff=inner_join(dist.year,dist,join_by(country,data.set,sex,var,level),suff
 pdf('results/margins.pdf')
 mar.res=list()
 for (nm in names(margins)) {
-	print(paste('****',nm))
+	# print(paste('****',nm))
 	df=inner_join(margins[[nm]],annual.hb,join_by(country,sex,year,data.set)) %>% 
 		filter(data.set=='donation0') %>% 
 		mutate(hb.dev=mean-hb)
@@ -176,7 +176,7 @@ for (nm in names(margins)) {
 			frml.char=paste0('hb.dev~',nm,'+0')
 			m=lm(formula(frml.char),weights=n,data=x)
 			sm=summary(m)
-			print(sm)
+			# print(sm)
 			df=data.frame(sm$coeff)
 			tv=-qt(0.025,df=sm$df[2])
 			df=data.frame(country=x$country[1],sex=x$sex[1],var=nm,level=as.integer(sub(nm,'',rownames(df))),df,
@@ -211,7 +211,7 @@ for (nm in names(margins)) {
 				x=x[-wh,]
 			}
 
-			lines(x$level,x$Estimate,col=col0,lwd=2,lty=ltys[[sex0]])
+			lines(x$level,x$Estimate,col=col0,lwd=2,lty=if (sex0=='Female') 'solid' else 'dashed') # ltys[[sex0]])
 			lines(x$level,x$upper,col=col0,lwd=1,lty='dashed')
 			lines(x$level,x$lower,col=col0,lwd=1,lty='dashed')
 		})
@@ -267,6 +267,6 @@ hb.cmp=inner_join(crtn.annual,hb.dummy,join_by(data.set,sex,country,year,)) %>%
 #	hb.cmp$hb[grepl(nm,hb.cmp$country)]= conversions[[nm]]*hb.cmp$hb[grepl(nm,hb.cmp$country)]
 # }
 
-pdf('results/trends-corrected.pdf')
+pdf('results/trends-corrected.pdf',width=12)
 plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=colours,colour.col='country')
 dev.off()
