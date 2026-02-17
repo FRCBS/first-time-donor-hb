@@ -25,45 +25,6 @@ file.names = file.names[!grepl('survival',file.names)]
 file.names = file.names[grepl('.xlsx$',file.names)]
 file.paths = paste(param$data.dir,file.names,sep='')
 
-plotByGroups.old = function(data,group.cols=c('sex','country'),xcol='level',ycols=c('Estimate','lower','upper'),
-		ltys=list(cm='dashed',fi='solid'),colours=list(Male='blue3',Female='red3'),main='') {
-
-	xmin=min(data[[xcol]][data[[xcol]]>=0])-1
-	ylim=c(min(data[,ycols]),max(data[,ycols]))
-	yspan=(ylim[2]-ylim[1])
-	plot(x=NULL,xlim=c(xmin,max(data[[xcol]])),ylim=c(ylim[1]-0.5*yspan,ylim[2]),
-		main=main,xlab=xcol,ylab=ycols[1])
-	lgnd=by(data,data[,group.cols],function(x) {
-			sex0=x[1,group.cols[1]] 
-			country0=x[1,group.cols[2]] 
-
-			col0=pp.cols[[sex0]]
-
-			wh = which(x[[xcol]]==-1)
-			if (length(wh) > 0) {
-				x0=min(x[[xcol]][-wh])-1+0.1*if(sex0=='Male') 0.2 else 0
-				arrows(x0,x[[ycols[2]]][wh],x0,x[[ycols[1]]][wh],length=0.05,angle=90,code=3,col=col0,lwd=1.5)
-				arrows(x0,x[[ycols[1]]][wh],x0,x[[ycols[3]]][wh],length=0.05,angle=90,code=3,col=col0,lwd=1.5)
-				x=x[-wh,]
-			}
-
-			m=lm(x[[ycols[1]]]~x[[xcol]])
-
-			lines(x[[xcol]],x[[ycols[1]]],col=col0,lwd=2,lty=ltys[[country0]])
-			lines(x[[xcol]],x[[ycols[3]]],col=col0,lwd=1,lty='dashed')
-			lines(x[[xcol]],x[[ycols[2]]],col=col0,lwd=1,lty='dashed')
-
-			sm=summary(m)
-			cf=round(sm$coeff,3)
-			print(summary(m))
-			text=paste0('b=',sprintf(cf[2,1],fmt='%.3f'),', p=',cf[2,4])
-			data.frame(text=paste(text,country0),b=cf[2,1],p=cf[2,4],lty=ltys[[country0]],col=col0)
-		})
-
-	legend.data=do.call(rbind,lgnd)
-	legend(x='bottom',legend=sub('cm','corrected',legend.data$text),col=legend.data$col,lty=legend.data$lty,lwd=2)
-}
-
 countries = list()
 for (file in file.paths) {
 	identifier = sub('.+[/\\]([a-z]+)[^/\\]+$','\\1',file)

@@ -8,7 +8,7 @@ library(dplyr)
 param=list()
 param$data.dir = 'C:/Users/super/OneDrive - University of Helsinki/veripalvelu/paper-2 hemoglobin/data/'
 param$shared.dir='C:/Users/super/OneDrive - University of Helsinki/veripalvelu/paper-2 hemoglobin/hb-paper-manuscripts/'
-param$shared.dir="c:/hy-version/first-time-donor-h/submit/"
+param$shared.dir="c:/hy-version/first-time-donor-hb/submit/"
 
 if (grepl('^VP',Sys.info()[4])) {
 	setwd('C:\\git_repot\\first-time-donor-hb\\src')

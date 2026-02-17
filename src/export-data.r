@@ -699,10 +699,12 @@ bsFlatten = function(x) {
 		data.frame(name=x,value=param[[x]])
 	}
 
-if (!'omit.data' %in% names(param) || is.null(param$omit.data)) {
+if (!'omit.data' %in% names(param) || is.null(param$omit.data) || (is.list(param$omit.data) && length(param$omit.data)==0)) {
 	param$omit.data='none defined'
 }
-param$omit.data='dummy'
+
+# param$omit.data='dummy'
+
 tst=lapply(names(param),bsFlatten)
 df.param=do.call(rbind,tst)
 
