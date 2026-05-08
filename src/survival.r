@@ -3,6 +3,13 @@ library(survival)
 library(RColorBrewer)
 library(openxlsx)
 
+# notes from 2026-02-24
+# [the effect of] reg. visit in nl [on their superior activity]
+# 1-s plots more reasonable [for survival curves]
+# seasonality fingertip vs. venous [effect on variation during day/year]
+# fr do venous sampling, they see seasonal variation [the same for Navarre]
+# good to report how many samples they do, etc. [if data is available, but should ask anyway]
+
 # setwd('C:\\git_repot\\first-time-donor-hb\\src')
 
 param=list()
