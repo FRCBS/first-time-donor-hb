@@ -39,14 +39,14 @@ datafile = file.path(param$wd,'donationdata.Rdata')
 ####
 # Reading source data files
 # nb! adjust the header (here excluded) and sep (here tab, '\t') parameters as necessary
-t.donation=read.csv('donation.csv',header=FALSE,colClasses=c(NA,NA,'Date',NA,NA),sep='\t')
+t.donation=read.csv('donation.csv',header=FALSE,colClasses=c(NA,'numeric',NA,'Date',NA,NA),sep='\t')
 t.deferral=read.csv('deferral.csv',header=FALSE,colClasses=c(NA,'POSIXct','POSIXct',NA),sep='\t')
 t.donor=read.csv('donor.csv',header=FALSE,colClasses=c(NA,NA,NA,NA,'Date',NA),sep='\t')
 t.contact=read.csv('contact.csv',header=FALSE,colClasses=c(NA,NA,NA,'POSIXct',NA),sep='\t')
 
 # print the structure for convenience at an early point
 t.donationdata = list(donation=t.donation,deferral=t.deferral,donor=t.donor,contact=t.contact)
-for (n in names(donationdata)) {
+for (n in names(t.donationdata)) {
   print(paste('structure of',n))
   data = t.donationdata[[n]]
   str(data[0,])
@@ -60,7 +60,7 @@ rm(t.donationdata)
 # nb! Make sure the column names match the content of the columns in case they are in different order
 # nb! Adjust here your data to match the column names used in data-description.xlsx
 
-colnames(t.donation)=c("releaseID","BloodDonationTypeKey","DonationDate","DonationPlaceType","DonationPlaceCode")
+colnames(t.donation)=c("releaseID","Hb","BloodDonationTypeKey","DonationDate","DonationPlaceType","DonationPlaceCode")
 colnames(t.deferral)=c("releaseID","DeferralStartDate","DeferralEndDate","DonorAdverseReactionType")
 colnames(t.donor)=c("releaseID","Sex","PostalCode","PermissionToInvite","DateOfBirth","BloodGroup")
 colnames(t.contact)=c("releaseID","ContactChannel","ContactType","DateSent","DonationSiteCode")
