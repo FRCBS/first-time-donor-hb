@@ -1,5 +1,6 @@
 library(tidyverse)
 library(openxlsx)
+library(xtable)
 
 colours=list()
 colours$fi='darkblue'
@@ -10,10 +11,15 @@ colours$nc='black'
 colours$ct='purple'
 colours$za='turquoise3' # 'violetred3'
 
+colfun = function(x) {
+	colours[[x]]
+}
+
 conversions=list()
 conversions$fi=1
 conversions$nl=10 / 0.6206
 conversions$nc=10
+conversions$au=1
 
 cn.names=list()
 cn.names$fi='Finland'
@@ -42,12 +48,13 @@ for (cn in names(colours))
 # this is the version from post-export-plotting.r
 # reverting that file to an old version from 2026-01-25
 plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c('Estimate','lower','upper'),
-		ltys=list(cm='dashed',fi='solid'),colours=list(Male='blue3',Female='red3'),main='',colour.col='sex') {
+		ltys=list(cm='dashed',fi='solid'),colours=list(Male='blue3',Female='red3'),main='',colour.col='sex',
+		trends='legend') {
 
 	xmin=min(data[[xcol]][data[[xcol]]>=0])-1
 	ylim=c(min(data[,ycols]),max(data[,ycols]))
 	yspan=(ylim[2]-ylim[1])
-	plot(x=NULL,xlim=c(xmin,max(data[[xcol]])+10),ylim=c(ylim[1],ylim[2]),
+	plot(x=NULL,xlim=c(xmin,max(data[[xcol]]) + if (trends=='legend') 10 else 0),ylim=c(ylim[1],ylim[2]),
 		main=if(main!='') main else '',xlab=xcol,ylab=ycols[1])
 	lgnd=by(data,data[,group.cols[!is.na(group.cols)]],function(x) {
 			sex0=x[1,group.cols[1]] 
@@ -73,7 +80,8 @@ plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c(
 				x=x[-wh,]
 			}
 
-			m=lm(x[[ycols[1]]]~x[[xcol]])
+			if (!is.null(trends))
+				m=lm(x[[ycols[1]]]~x[[xcol]])
 
 			if (!country0 %in% names(ltys))
 				ltys[[country0]]='solid'
@@ -82,15 +90,50 @@ plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c(
 			lines(x[[xcol]],x[[ycols[3]]],col=col0,lwd=1,lty='dotted')
 			lines(x[[xcol]],x[[ycols[2]]],col=col0,lwd=1,lty='dotted')
 
-			sm=summary(m)
-			cf=round(sm$coeff,3)
-			print(summary(m))
-			text=paste0('b=',sprintf(cf[2,1],fmt='%.3f'),', p=',cf[2,4])
-			data.frame(text=paste(text,country0),b=cf[2,1],p=cf[2,4],lty=ltys[[country0]],col=col0)
+			if (trends=='legend') {
+				sm=summary(m)
+				cf=round(sm$coeff,3)
+				print(summary(m))
+				text=paste0('b=',sprintf(cf[2,1],fmt='%.3f'),', p=',cf[2,4])
+				return(data.frame(text=paste(text,country0),b=cf[2,1],p=cf[2,4],lty=ltys[[country0]],col=col0))
+			} else if (trends=='table') {
+				rdf=data.frame(summary(m)$coeff)
+				for (gc in group.cols) 
+					rdf[[gc]]=x[[gc]][1]
+				colnames(rdf)[4]='p.value'
+				rdf$par='(Intercept)'
+				rdf$par[2]=ycols[1]
+
+				cn.col=which(group.cols=='country')
+				if (length(cn.col) > 0 && grepl('corrected',x[[group.cols[cn.col]]][1]) && rdf$p.value[2] < 0.05) {
+					a=rdf[1,1]
+					b=rdf[2,1]
+					n=length(x[[xcol]])
+					# abline(a=rdf[1,1],b=rdf[2,1])
+					lines(c(x[[xcol]][1],x[[xcol]][n]),c(a+b*x[[xcol]][1],a+b*x[[xcol]][n]),col=col0,lwd=1,lty='dashed')
+				}
+
+				return(rdf)
+			}
 		})
 
-	legend.data=do.call(rbind,lgnd)
-	legend(x='bottomright',legend=sub('cm','corrected',legend.data$text),col=legend.data$col,lty=legend.data$lty,lwd=2)
+	# grps$country
+	if ('country' %in% group.cols) {
+bsAssign('data')
+		cn.ids=sort(unique(data$country))
+		cn.ids=cn.ids[!grepl('corrected',cn.ids)]
+		legend('bottomleft',fill=unlist(sapply(cn.ids,FUN=colfun)),legend=sapply(cn.ids,FUN=function(cn) {
+			paste0(cn.names[[cn]])}))
+	}
+
+	if (trends == 'legend') {
+		legend.data=do.call(rbind,lgnd)
+		legend(x='bottomright',legend=sub('cm','corrected',legend.data$text),col=legend.data$col,lty=legend.data$lty,lwd=2)
+	}
+
+	if (trends == 'table') {
+		return(do.call(rbind,lgnd))
+	}
 }
 
 # nb! should use the similar implementation in the previous project to enable easier and more parametric
@@ -135,3 +178,38 @@ plotParameters2 = function(ce,xvar='log_alpha',yvar='yf',col.var='sex',group.by=
 	})
 }
 
+html.template="<!DOCTYPE html>
+<html>
+<head>
+<style>
+html *
+{
+   font-size: 1em !important;
+   color: #000 !important;
+   font-family: Arial !important;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+td, th {
+  border: 1px solid #ffffff;
+  text-align: right;
+  padding: 4px;
+  font-size: 11px;
+}
+
+table td:first-child {
+    text-align: left;
+}​
+
+tr:nth-child(even) {
+  background-color: #ffffff;
+}
+</style>
+</head>
+<body>
+¤table¤
+</body>
+</html>"

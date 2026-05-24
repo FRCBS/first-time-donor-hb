@@ -30,7 +30,12 @@ dummy=by(res.curves,res.curves[,c('country','ord','sex')],function(df) {
 
 		# This is promising based on description, but seems not to work after all
 		# m.ss=nls(surv~SSweibull(time,yf,y0,log_alpha,poweri),data=df)
-		m.ss=nls(surv~SSasymp(sqrt.x,yf,y0,log_alpha),data=df)
+		m.ss=NULL
+		try(m.ss<-nls(surv~SSasymp(sqrt.x,yf,y0,log_alpha),data=df))
+
+		if (is.null(m.ss)) {
+			return(NULL)
+		}
 		sm=summary(m.ss)
 
 		# plot(surv~time,data=df,type='l',lwd=2,xlim=c(0,2*365),ylim=c(0,1),
@@ -45,6 +50,24 @@ dummy=by(res.curves,res.curves[,c('country','ord','sex')],function(df) {
 ce=do.call(rbind,lapply(dummy,function(x) x$parameters))
 fitted=do.call(rbind,lapply(dummy,function(x) x$fitted.data))
 
+pdf('results\\survival-joint-curves.pdf')
+by(fitted,fitted$ord,function(x) {
+	# plot here
+	plot(x=NULL,xlim=c(0,2*365),ylim=c(0,1),main=x$ord[1],ylab='survival',xlab='time')
+	by(x,x[,c('sex','country')],function(y) {
+		country0=y$country[1]
+		sex0=y$sex[1]
+		col=colours[[country0]]
+		# pch=pchs[[sex0]]
+
+		lines(fitted~time,data=y,col=col,lwd=2,lty='dotted')
+		lines(surv~time,data=y,col=col,lwd=2,lty=if (sex0=='Female') 'solid' else '8282')
+
+		# wh=seq(1,y$time[nrow(y],by=50)
+		# points(y$surv[wh],)
+	})
+})
+dev.off()
 pdf('results\\survival-joint-curves.pdf')
 by(fitted,fitted$ord,function(x) {
 	# plot here

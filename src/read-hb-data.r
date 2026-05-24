@@ -105,6 +105,8 @@ annual.hb = annual.hb.dist %>%
 	summarise(n.donor=sum(n),hb=sum(hb*n)/sum(n),.groups='drop') %>%
 	data.frame()
 
+# annual.hb0 %>% filter(country=='au')
+
 totals=lapply(names(margins),FUN=function(nm) {
 		margins[[nm]] %>%
 			group_by(country,data.set,sex) %>%
@@ -173,6 +175,10 @@ for (nm in names(margins)) {
 	df[[nm]]=as.character(df[[nm]])
 
 	rlist=by(df,df[,c('sex','country')],function(x) {
+			# 2026-05-24 Handle the case that hourly data is missing
+			if (length(table(x[[nm]])) == 1) 
+				return(NULL) 
+
 			frml.char=paste0('hb.dev~',nm,'+0')
 			m=lm(formula(frml.char),weights=n,data=x)
 			sm=summary(m)
@@ -212,13 +218,13 @@ for (nm in names(margins)) {
 			}
 
 			lines(x$level,x$Estimate,col=col0,lwd=2,lty=if (sex0=='Female') 'solid' else 'dashed') # ltys[[sex0]])
-			lines(x$level,x$upper,col=col0,lwd=1,lty='dashed')
-			lines(x$level,x$lower,col=col0,lwd=1,lty='dashed')
+			# lines(x$level,x$upper,col=col0,lwd=1,lty='dashed')
+			# lines(x$level,x$lower,col=col0,lwd=1,lty='dashed')
 		})
 
 	mar.res[[nm]]=var.data
 }
-dev.off()
+dev.off() # margins.pdf
 
 crtn=do.call(rbind,mar.res)
 crtn$level=as.character(crtn$level)
@@ -250,23 +256,74 @@ colnames(conversions.df)='rate'
 conversions.df$country=rownames(conversions.df)
 
 plotByGroups(crtn.annual,group.cols=c('sex','country'),xcol='year',ycols=c('correction'),colours=list(Male='blue3',Female='red3'))
+
+use.years=annual.hb %>%
+	group_by(country) %>%
+	summarise(year.min=min(year)+2,year.max=max(year)-1,.groups='drop')
+
 hb.dummy=annual.hb %>%
 	filter(data.set=='donation0') %>%
 	inner_join(conversions.df,join_by(country)) %>%
-	mutate(hb=rate*hb)
+	mutate(hb=rate*hb) %>%
+	inner_join(use.years,join_by(country,between(year,y$year.min,y$year.max))) %>%
+	select(-year.min) %>%
+	select(-year.max)
+
 plotByGroups(hb.dummy,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=list(Male='blue3',Female='red3'))
+
+#crtn.annual = crtn.annual %>%
+#	inner_join(use.years,join_by(country,between(year,y$year.min,y$year.max))) %>%
+#	select(-year.min) %>%
+#	select(-year.max)
 
 hb.cmp=inner_join(crtn.annual,hb.dummy,join_by(data.set,sex,country,year,)) %>%
 	mutate(hb=hb+correction,country=paste0(country,'-corrected')) %>%
 	select(!!!syms(colnames(hb.dummy))) %>%
-	rbind(hb.dummy) %>%
-	dplyr::filter(year>=2002,year<2024) # 2026-02-08 nb! must filter each country based on their own years
+	rbind(hb.dummy)
+# ?between
+	# dplyr::filter(year>=2002,year<2024) # 2026-02-08 nb! must filter each country based on their own years
 # nb! must do the conversion properly as well
+hb.cmp %>% filter(country=='fi') %>% summarize(min(year))
+crtn.annual %>% filter(country=='fi') %>% summarize(min(year))
 
-# for (nm in names(conversions)) {
-#	hb.cmp$hb[grepl(nm,hb.cmp$country)]= conversions[[nm]]*hb.cmp$hb[grepl(nm,hb.cmp$country)]
-# }
+
+source('src/analysis-functions.r')
 
 pdf('results/trends-corrected.pdf',width=12)
-plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=colours,colour.col='country')
+sms=plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=colours,colour.col='country',trends='table')
 dev.off()
+
+trends.table = sms %>% 
+	filter(par=='hb') %>%
+	rowwise() %>%
+	mutate(corrected=sub('^..','',sub('-corrected','yes',country))) %>%
+	mutate(country=sub('-corrected','',country)) %>%
+	# rename(p.value=Pr...t.) %>%
+	dplyr::select(country,sex,corrected,Estimate,p.value) %>%
+	mutate(p.value=round(p.value,4)) %>%
+	arrange(desc(corrected))
+wh=which(trends.table$p.value<0.05)
+if (length(wh) > 0) {
+	trends.table$p.value[wh]=paste0('¤',trends.table$p.value[wh],'%')
+}
+
+# xt=xtable(trends.table)
+html.table=paste(capture.output(print(xtable(trends.table,digits=5),type='html',include.rownames=FALSE)),collapse='\n')
+html.table=gsub('¤([^%]+)%','<b>\\1</b>',html.table)
+cat(gsub('¤([^%]+)%','<b>\\1</b>',html.table))
+
+caption='Estimated trends by country and sex for both corrected and uncorrected annual hemoglobin mean values'
+html.file=sub('¤table¤',paste0(caption,'\n',html.table),html.template)
+cat(html.file,file=paste0('results/','trends.html'))
+cat(html.table)
+
+### Table of the correction by sex, country, year and variable (month,hour,age)
+
+str(crtn.mean)
+ctb=crtn.mean %>%
+	group_by(sex,country,year,var) %>%
+	summarise(crtn=sum(correction),.groups='drop')
+
+ctb2=pivot_wider(ctb,values_from='crtn',names_from='var')
+ctb3=full_join(ctb2 %>% filter(sex == 'Female'),ctb2 %>% filter(sex == 'Male'),join_by(country,year))
+write.xlsx(ctb3,file='results/corrections.xlsx')
