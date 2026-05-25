@@ -1,21 +1,48 @@
 source('src/analysis-functions.r')
 
-pdf('results\\survival-joint.pdf',width=12,height=6)
+names(colours)
+pdf('results\\survival-joint-with-levels.pdf',width=12,height=6)
 vars=c('ord.group.full','bloodgr','sex')
-lapply(vars,function(x) {
+vars.levels=list(
+	a=list(var='ord.group.full',legend.position='topleft'),
+	b=list(var='bloodgr'),
+	c=list(var='age.group.t',level=c('(15,20]')),
+	c2=list(var='hb.surplus',level=c('bottom 10%')),
+	c3=list(var='hb.surplus',level=c('bottom 10-25%')),
+	d=list(var='bloodgr'))
+# lapply(vars,function(x) {
+lapply(names(vars.levels),function(x) {
 bsAssign('x')
-		df=res.models %>% filter(var==x)
+		x=vars.levels[[x]]
+		df=res.models %>% filter(var==x$var)
 
-		if (x!='sex') {
+		level=''
+		if ('level' %in% names(x)) {
+			df=df %>% filter(level==x$level)
+			level=x$level
+		}
+
+		ylim=
+
+		legend.position=''
+		if ('legend.position' %in% names(x)) {
+			legend.position=x$legend.position
+		}
+
+		if (x$var!='sex') {
 			par(mfrow=c(1,2))
 		} else {
 			# nb! must fetch new data and remove this hard-coding
 			df$sex='Female'
 		}
+
+		ycols=c('exp.coef','lower..95','upper..95')
+		ylim=c(min(df[,ycols]),max(df[,ycols]))
 		by(df,df[,'sex'],function(y) {
+bsAssign('y')
 			sex0=y[1,'sex']
-			plotByGroups(y,group.cols=c(NA,'country'),xcol='ord',ycols=c('exp.coef','lower..95','upper..95')
-				,colours=colours,ltys=ltys,main=paste(x,sex0))
+			plotByGroups(y,group.cols=c(NA,'country'),xcol='ord',ycols=ycols,ylim=ylim,
+				colours=colours,ltys=ltys,main=paste(x$var,sex0,level),trends='',legend.position=legend.position)
 		})
 	})
 dev.off()
@@ -92,3 +119,5 @@ pdf('results/survival-parameters.pdf')
 # list(Male='blue3',Female='red3')
 plotParameters2(ce,xvar='log_alpha',yvar='yf',group.by=c('country','sex'),col.var='country',pp.cols=colours,shade.var='ord')
 dev.off()
+
+sapply(unique(res.models$country),plotSurvivalCurvesByCountry)

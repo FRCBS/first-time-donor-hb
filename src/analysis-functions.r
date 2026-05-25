@@ -30,6 +30,29 @@ cn.names$nc='Navarre'
 cn.names$ct='Catalonia'
 cn.names$za='South Africa'
 
+colours[['top 10%']]='blue3'
+colours[['top 10-25%']]='lightblue'
+colours[['bottom 10-25%']]='pink'
+colours[['bottom 10%']]='red3'
+colours[['(25,40]']]='green3'
+colours[['(40,100]']]='gray3'
+colours[['O-']]='blue3'
+colours[['general']]='black'
+
+lvs=c('(15,20]','(20,25]','(25,30]','(30,35]','(35,40]','(45,50]','(50,55]','(55,60]','(60,100]')
+# lvs=levels(dlink$age.group.t)
+# palette=colorRampPalette(c("blue4", "white"))(length(lvs)+3)
+
+# library(RColorBrewer)
+# qual_col_pals = brewer.pal.info[brewer.pal.info$category=='qual',]
+# col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
+# the qual palette as constants (the brewer package must be installed separately, want to avoid that)
+col_vector=c('#7FC97F','#BEAED4','#FDC086','#FFFF99','#386CB0','#F0027F','#BF5B17','#666666','#1B9E77','#D95F02','#7570B3','#E7298A','#66A61E','#E6AB02','#A6761D','#666666','#A6CEE3','#1F78B4','#B2DF8A','#33A02C','#FB9A99','#E31A1C','#FDBF6F','#FF7F00','#CAB2D6','#6A3D9A','#FFFF99','#B15928','#FBB4AE','#B3CDE3','#CCEBC5','#DECBE4','#FED9A6','#FFFFCC','#E5D8BD','#FDDAEC','#F2F2F2','#B3E2CD','#FDCDAC','#CBD5E8','#F4CAE4','#E6F5C9','#FFF2AE','#F1E2CC','#CCCCCC','#E41A1C','#377EB8','#4DAF4A','#984EA3','#FF7F00','#FFFF33','#A65628','#F781BF','#999999','#66C2A5','#FC8D62','#8DA0CB','#E78AC3','#A6D854','#FFD92F','#E5C494','#B3B3B3','#8DD3C7','#FFFFB3','#BEBADA','#FB8072','#80B1D3','#FDB462','#B3DE69','#FCCDE5','#D9D9D9','#BC80BD','#CCEBC5','#FFED6F')
+
+for (i in 1:length(lvs)) {
+	colours[[lvs[i]]]=if (i<length(lvs)) col_vector[i] else 'white' # palette[i]
+}
+
 pchs=list(Female=2,Male=6)
 
 ltys=list(Female='solid',Male='A2')
@@ -49,10 +72,11 @@ for (cn in names(colours))
 # reverting that file to an old version from 2026-01-25
 plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c('Estimate','lower','upper'),
 		ltys=list(cm='dashed',fi='solid'),colours=list(Male='blue3',Female='red3'),main='',colour.col='sex',
-		trends='legend') {
+		trends='legend',legend.position='',ylim=NULL) {
 
 	xmin=min(data[[xcol]][data[[xcol]]>=0])-1
-	ylim=c(min(data[,ycols]),max(data[,ycols]))
+	if (is.null(ylim)) 
+		ylim=c(min(data[,ycols]),max(data[,ycols]))
 	yspan=(ylim[2]-ylim[1])
 	plot(x=NULL,xlim=c(xmin,max(data[[xcol]]) + if (trends=='legend') 10 else 0),ylim=c(ylim[1],ylim[2]),
 		main=if(main!='') main else '',xlab=xcol,ylab=ycols[1])
@@ -118,11 +142,10 @@ plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c(
 		})
 
 	# grps$country
-	if ('country' %in% group.cols) {
-bsAssign('data')
+	if ('country' %in% group.cols && legend.position!='') {
 		cn.ids=sort(unique(data$country))
 		cn.ids=cn.ids[!grepl('corrected',cn.ids)]
-		legend('bottomleft',fill=unlist(sapply(cn.ids,FUN=colfun)),legend=sapply(cn.ids,FUN=function(cn) {
+		legend(legend.position,fill=unlist(sapply(cn.ids,FUN=colfun)),legend=sapply(cn.ids,FUN=function(cn) {
 			paste0(cn.names[[cn]])}))
 	}
 
@@ -213,3 +236,97 @@ tr:nth-child(even) {
 ¤table¤
 </body>
 </html>"
+
+# Copied the main bits from post-export-plotting.r
+# The idea is to produce the single-country survival plots 
+plotSurvivalCurvesByCountry = function(cn) {
+	res.models.all = res.models %>% filter(country==cn)
+	res.curves = res.curves %>% filter(country==cn)
+	# country=res.models.all$country[1]
+	
+	pdf(paste0('results/survival-figures-',cn,'.pdf'))
+	by(res.models.all,res.models.all[,c('sex','var')],function(y) {
+	bsAssign('y')
+		if (length(unique(y$level))==1)
+			y$level='general'
+
+		y=y %>% filter(!is.na(ord))
+
+		if (nrow(y) == 1)
+			return(NULL)
+
+		ylim=c(min(y$exp.coef,na.rm=TRUE),max(y$exp.coef,na.rm=TRUE)) #c(0.70,1.40)
+		y.delta=ylim[2]-ylim[1]
+		ylim=c(ylim[1]-0.3*y.delta,ylim[2]+0.2*y.delta)
+		plot(x=NULL,type='n',xlim=c(1,max(y$ord)),ylim=ylim,main=paste(y$sex[1],y$var[1]),
+			xlab='number of donation',ylab='relative likelihood of donation')
+		abline(h=1,lwd=1,lty='dashed')
+		breaks=y$breaks[1]
+
+		# factor out the age.group.t breaks
+		if (grepl(';',breaks))
+			breaks='-' 
+
+		col.fun=function(x) {if (x %in% names(colours)) colours[[x]] else 'white'}
+
+		if (max(y$ord) == param$max.ord.group.number+1) 
+			abline(v=max(y$ord)-0.5,lwd=1,lty='dashed')
+
+		brk.labels=if (breaks!='-') rev(getIntervals(breaks)) else ''
+		if (length(brk.labels) > 1) {
+			levels=rev(unique(y$level))
+		} else {
+			levels=(unique(y$level))
+		}
+
+		if (length(levels) > 1) {
+			fill=sapply(levels,col.fun)
+			levels=levels[fill!='white']
+			fill=fill[fill!='white']
+			legend(x='bottomright',legend=paste(levels,brk.labels),fill=sapply(levels,col.fun))
+		}
+
+		res.void=by(y,y[,c('var','level')],function(x) {
+				gr=x$level[1]
+				col=col.fun(gr)
+				if (col=='white')
+					return(NULL)
+				ordint=x$ord
+				lines(ordint,x$exp.coef,lwd=2,col=col)
+				lines(ordint,x$lower..95,lwd=2,lty='dotted',col=col)
+				lines(ordint,x$upper..95,lwd=2,lty='dotted',col=col)
+			})
+		})
+	dev.off()
+
+	pdf(paste0('results/survival-curves-',cn,'.pdf'))
+	dummy=by(res.curves,res.curves[,c('sex','ord')],function(df) {
+			wh=min(which(df$surv<0.99))
+			len0=length(df$surv)
+			df=df[wh:len0,]
+			df$time=df$time[wh:len0]-wh
+			df$sqrt.x=sqrt(df$time)
+
+			# This is promising based on description, but seems not to work after all
+			# m.ss=nls(surv~SSweibull(time,yf,y0,log_alpha,poweri),data=df)
+
+			m.ss=NULL
+			# This fitting is copied, need to do in one place only
+			try(m.ss<-nls(surv~SSasymp(sqrt.x,yf,y0,log_alpha),data=df))
+			if (is.null(m.ss)) {
+				return(NULL)
+			}
+
+			# m.ss=nls(surv~SSasymp(sqrt.x,yf,y0,log_alpha),data=df)
+			sm=summary(m.ss)
+
+			plot(surv~time,data=df,type='l',lwd=2,xlim=c(0,2*365),ylim=c(0,1),
+				main=paste(df$sex[1],df$ord[1]))
+			pred.ss=predict(m.ss,data.frame(sqrt.x=df$sqrt.x))
+			lines(df$time,pred.ss,col='red2',lwd=2.5)
+
+			tv=qt(0.025,df=sm$df[2])
+			return(data.frame(sex=df$sex[1],ord=df$ord[1],var=rownames(sm$coeff),sm$coeff,lower=sm$coeff[,1]-tv*sm$coeff[,2],upper=sm$coeff[,1]+tv*sm$coeff[,2]))
+		})
+	dev.off()
+}

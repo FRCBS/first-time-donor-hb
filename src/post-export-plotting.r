@@ -359,6 +359,7 @@ spec=spec.list$country
 
 #####################
 # survival plotting
+# res.models.all = res.models %>% filter(country=='au')
 
 #####
 # Below, some plots are drawn for survival data
@@ -372,7 +373,8 @@ colours[['(40,100]']]='gray3'
 colours[['O-']]='blue3'
 colours[['general']]='black'
 
-lvs=levels(dlink$age.group.t)
+lvs=c('(15,20]','(20,25]','(25,30]','(30,35]','(35,40]','(45,50]','(50,55]','(55,60]','(60,100]')
+# lvs=levels(dlink$age.group.t)
 palette=colorRampPalette(c("blue4", "white"))(length(lvs)+3)
 
 library(RColorBrewer)
@@ -397,8 +399,13 @@ y=res.models.all %>% filter(sex=='Female',var=='ord.group.full')
 
 pdf('results/survival-figures.pdf')
 by(res.models.all,res.models.all[,c('sex','var')],function(y) {
+bsAssign('y')
 	if (length(unique(y$level))==1)
 		y$level='general'
+
+# print(y$var[1])
+# if (y$var[1]=='age.group.t') 
+#	error(11)
 
 	y=y %>% filter(!is.na(ord))
 
@@ -422,8 +429,17 @@ by(res.models.all,res.models.all[,c('sex','var')],function(y) {
 	if (max(y$ord) == param$max.ord.group.number+1) 
 		abline(v=max(y$ord)-0.5,lwd=1,lty='dashed')
 
-	brk.labels=if (breaks!='-') getIntervals(breaks) else ''
-	levels=rev(unique(y$level))
+	brk.labels=if (breaks!='-') rev(getIntervals(breaks)) else ''
+	if (length(brk.labels) > 1) {
+		levels=rev(unique(y$level))
+	} else {
+		levels=(unique(y$level))
+	}
+
+print(brk.labels)
+print(levels)
+
+
 	if (length(levels) > 1) {
 		fill=sapply(levels,col.fun)
 		levels=levels[fill!='white']

@@ -30,6 +30,7 @@ file.names = file.names[grepl('.xlsx$',file.names)]
 file.paths = paste(param$data.dir,file.names,sep='')
 
 # Should be moved to a common functions file; now coexists in both read-* files
+# nb! This has actually been moved to analysis-functions.r (and edited there for trends and such)
 plotByGroups.obsolete = function(data,group.cols=c('sex','country'),xcol='level',ycols=c('Estimate','lower','upper'),
 		ltys=list(cm='dashed',fi='solid',nl='solid'),colours=list(Male='blue3',Female='red3'),main='') {
 
