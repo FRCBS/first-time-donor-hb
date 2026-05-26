@@ -330,3 +330,148 @@ plotSurvivalCurvesByCountry = function(cn) {
 		})
 	dev.off()
 }
+
+getIntervals = function(breaks) {
+	brs=strsplit(breaks,',')[[1]]
+	mid.bits=sapply(2:(length(brs)-2),function(x) paste0('(',brs[x],',',brs[x+1],']'))
+	lower=paste0('<',brs[2])
+	upper=paste0('>',brs[length(brs)-1])
+	return(c(lower,mid.bits[-2],upper))
+}
+
+### copied from main-with-export.Rmd
+# This is the function that correct the kink in a distriution (data0)
+# The function can be either called with data0 != NULL; data0 should then have the structure of simple, donation0 or donation.r
+#	 and can be a subset of these.
+# *or* with freq != NULL, with the structure of hb.freq
+# Nb! This function operates on a single distribution
+rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL) {
+	if (is.null(cutoff)) {
+		if (is.null(sex)) {
+			if (is.null(data0)) {
+				sex = unique(freq$Sex)[1]
+			} else
+				sex = unique(data0$Sex)[1]
+		} 
+		cutoff = if (sex=='Female') param$cutoff.female else param$cutoff.male
+	}
+
+	if (!is.null(data0)) {
+		# sex0=data0[data0$Sex==sex&!is.na(data0$Hb)&data0$BloodDonationTypeKey %in% c('Whole Blood (K)','No Donation (E)'),c('Hb')]	
+		freq = data0 %>%
+			group_by(Hb) %>%
+			summarise(n=n()) %>%
+			mutate(prop=n/sum(n))
+	} else {
+		freq = freq %>%
+			group_by(Hb) %>%
+			summarise(n=sum(n),.groups='drop')
+	}
+	
+	freq = freq[!is.na(freq$Hb),]
+	
+	if (!'prop' %in% colnames(freq)) {
+		sum.n = sum(freq$n) # -coalesce(freq$nas,0))
+		freq$prop = freq$n / sum.n
+	}
+	
+	freq.mean = freq %>%
+		filter(!is.na(Hb)) %>% # These are the summary rows for NA; leave them out at this point
+		summarise(n2=sum(n),mean0=sum(Hb*(n))/n2,.groups='drop')
+	
+	freq.stats = freq %>%
+		filter(!is.na(Hb)) %>% # These are the summary rows for NA; leave them out at this point
+		mutate(dev=Hb-freq.mean$mean0) %>% # ,prop=n/n2) %>%
+		group_by() %>%
+		summarise(mean=min(freq.mean$mean0),n0=min(n),var=sum(prop*dev^2),sd=sqrt(var),
+							skewness=sum(prop*(dev/sd)^3),kurtosis=sum(prop*(dev/sd)^4),.groups='drop')
+	mean0= freq.stats$mean
+	sd0 = freq.stats$sd
+
+	Hb.values = sort(unique(freq$Hb))
+	if (FALSE) {
+		dx <- 1. #depends on units, but should now all be converted to g/L
+	} else	{
+		if (param$hb.decimals == 1){
+			dx <- 0.1 #depends on units, but should now all be converted to g/L
+		} else{
+			dx = 1.
+		}
+	}
+	ndist=dnorm(Hb.values,mean=mean0,sd=sd0)*dx
+	
+	# Plotting the unchanged distribution
+	if (plot) {
+		plot(prop~Hb,data=freq,type='l',lwd=2)
+		lines(Hb.values,ndist)
+	
+		# A plot showing the difference between the distribution defined by data0 and the
+		# normal distribution estimated from that data
+		plot(freq$prop-ndist~Hb.values)
+		abline(v=cutoff,col='blue')
+		abline(h=c(-1,1)*0.0005,col='red')
+	}
+
+	# This is the part that 
+	cnt = 0
+	freq2 = freq
+	# cover the case that there is no data at the cutoff value (should not occur with reasonable data volumes)
+	# k = which(freq$Hb==cutoff)
+	k = max(which(freq$Hb<=cutoff))
+	if (length(k) == 0 || k == -Inf) 
+		k = min(which(freq$Hb>=cutoff))
+	while (TRUE) {
+		diff = (freq2$prop-ndist)[1:(k-1)]
+		wh = which(diff < -0.0005)
+		if (length(wh) == 0)
+			break
+		wh0 = max(wh)
+		ds0 = diff[wh0]
+		
+		diff.plus = (freq2$prop-ndist)[k:nrow(freq2)]
+		wh = which(diff.plus > 0.0005)
+		if (length(wh) == 0)
+			break
+		wh1 = min(wh)
+		ds1 = diff.plus[wh1]
+		
+		to.adjust = min(-ds0,ds1)
+		
+		freq2$prop[wh0] = freq2$prop[wh0] + to.adjust
+		freq2$prop[wh1+(k-1)] = freq2$prop[wh1+(k-1)] - to.adjust
+		
+		cnt = cnt + 1
+		if (cnt > 1000) {
+			print('max iterations exceeded (back-stop)')
+			break
+		}
+	}
+
+	mean1 = freq2 %>% 
+			mutate(mom=Hb*prop) %>%
+			summarise(mean=sum(mom))
+	mean1=as.numeric(mean1)
+	sd1 =	freq2 %>% 
+			mutate(mom=(Hb-as.numeric(mean1))^2*prop) %>%
+			summarise(sdx=sum(mom)) 
+	sd1=sqrt(as.numeric(sd1))
+	
+	# The theoretical deferred proportion is computed here
+	deferred.prop = pnorm(cutoff-0.5,mean1,sd1)
+
+	if (plot) {
+		plot(prop~Hb,data=freq2,type='l',lwd=3,xlim=NULL)
+		lines(prop~Hb,data=freq2,col='green', lwd=2)
+		ndist2=dnorm(Hb.values,mean=mean1,sd=sd1)*dx
+		lines(Hb.values,ndist2,col='red',lty='dotted',lwd=2)
+		abline(v=cutoff,col='blue',lty='dashed')
+		rect(mean1-5,0,mean1+5,0.001,col='pink',lwd=2)
+		abline(v=mean1,lty='dotted',lwd=3)
+		
+		plot(freq2$prop-ndist2~Hb.values)
+		abline(v=cutoff,col='blue',lty='dashed')
+		abline(h=c(-1,1)*0.0005,col='red',lty='dashed')
+	}
+
+	return(list(dist=freq2,params=list(mean=mean1,sd=sd1,deferred.prop=deferred.prop)))
+}

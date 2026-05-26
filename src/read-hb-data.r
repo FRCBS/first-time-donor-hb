@@ -60,9 +60,10 @@ for (nm in names(countries[[1]])) {
 	colnames(data)=sub('\\.hb$','',colnames(data))
 	colnames(data)=tolower(colnames(data))
 
-	assign(nm,data)	
+	assign(nm,data)
 }
 
+# annual hb and other names come from the xlsx sheet names
 annual.hb.dist=annual.hb
 monthly=montly.statistics
 rm(montly.statistics)
@@ -99,10 +100,25 @@ hourly.grouped=hourly.statistics %>%
 # use the newly formed grouped hourly statistics instead of the original one
 margins[['hour']]=hourly.grouped
 
+# 2026-05-25
+use.years=annual.hb %>%
+	group_by(country) %>%
+	summarise(year.min=min(year)+2,year.max=max(year)-1,.groups='drop')
+
+margins=lapply(margins,function(x) {
+		x %>%
+			inner_join(use.years,join_by(country,between(year,y$year.min,y$year.max))) %>%
+			select(-year.min) %>%
+			select(-year.max) 
+	})
+
 annual.hb = annual.hb.dist %>%
 	filter(abs(hb)!=1000000) %>%
 	group_by(data.set,sex,country,year) %>%
-	summarise(n.donor=sum(n),hb=sum(hb*n)/sum(n),.groups='drop') %>%
+	summarise(n.donor=sum(n),hb=sum(hb*n)/sum(n),.groups='drop') # %>%
+	# inner_join(use.years,join_by(country,between(year,y$year.min,y$year.max))) # %>%
+	# select(-year.min) %>%
+	# select(-year.max) %>%
 	data.frame()
 
 # annual.hb0 %>% filter(country=='au')
@@ -257,17 +273,18 @@ conversions.df$country=rownames(conversions.df)
 
 plotByGroups(crtn.annual,group.cols=c('sex','country'),xcol='year',ycols=c('correction'),colours=list(Male='blue3',Female='red3'))
 
-use.years=annual.hb %>%
-	group_by(country) %>%
-	summarise(year.min=min(year)+2,year.max=max(year)-1,.groups='drop')
+# 2026-05-25
+# use.years=annual.hb %>%
+#	group_by(country) %>%
+#	summarise(year.min=min(year)+2,year.max=max(year)-1,.groups='drop')
 
 hb.dummy=annual.hb %>%
 	filter(data.set=='donation0') %>%
 	inner_join(conversions.df,join_by(country)) %>%
-	mutate(hb=rate*hb) %>%
-	inner_join(use.years,join_by(country,between(year,y$year.min,y$year.max))) %>%
-	select(-year.min) %>%
-	select(-year.max)
+	mutate(hb=rate*hb) # %>%
+	# inner_join(use.years,join_by(country,between(year,y$year.min,y$year.max))) %>%
+	# select(-year.min) %>%
+	# select(-year.max)
 
 plotByGroups(hb.dummy,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=list(Male='blue3',Female='red3'))
 
@@ -285,7 +302,6 @@ hb.cmp=inner_join(crtn.annual,hb.dummy,join_by(data.set,sex,country,year,)) %>%
 # nb! must do the conversion properly as well
 hb.cmp %>% filter(country=='fi') %>% summarize(min(year))
 crtn.annual %>% filter(country=='fi') %>% summarize(min(year))
-
 
 source('src/analysis-functions.r')
 
@@ -318,12 +334,12 @@ cat(html.file,file=paste0('results/','trends.html'))
 cat(html.table)
 
 ### Table of the correction by sex, country, year and variable (month,hour,age)
-
-str(crtn.mean)
 ctb=crtn.mean %>%
-	group_by(sex,country,year,var) %>%
+	group_by(country,year,sex,var) %>%
 	summarise(crtn=sum(correction),.groups='drop')
 
 ctb2=pivot_wider(ctb,values_from='crtn',names_from='var')
 ctb3=full_join(ctb2 %>% filter(sex == 'Female'),ctb2 %>% filter(sex == 'Male'),join_by(country,year))
 write.xlsx(ctb3,file='results/corrections.xlsx')
+
+# nb! Should produce the heatmap tables in R instead to make it automatic

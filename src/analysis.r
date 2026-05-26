@@ -1,7 +1,5 @@
 source('src/analysis-functions.r')
 
-names(colours)
-pdf('results\\survival-joint-with-levels.pdf',width=12,height=6)
 vars=c('ord.group.full','bloodgr','sex')
 vars.levels=list(
 	a=list(var='ord.group.full',legend.position='topleft'),
@@ -11,13 +9,27 @@ vars.levels=list(
 	c3=list(var='hb.surplus',level=c('bottom 10-25%')),
 	d=list(var='bloodgr'))
 # lapply(vars,function(x) {
-lapply(names(vars.levels),function(x) {
-bsAssign('x')
-		x=vars.levels[[x]]
+
+vars2=c('ord.group.full','bloodgr','age.group.t','hb.surplus')
+vl.comb=left_join(data.frame(var=vars2),unique((res.models %>% mutate(level=coalesce(level,'-')))[,c('var','level')]),join_by(var))
+singles = vl.comb %>% 
+	group_by(var) %>%
+	summarise(n=n()) %>%
+	filter(n==1) %>%
+	dplyr::select(var)
+vl.comb$level[vl.comb$var %in% unlist(singles)]=NA
+vl.comb$legend.position=NA
+vl.comb$legend.position[1]='topleft'
+x=unclass(vl.comb[1,])
+
+pdf('results\\survival-joint-with-levels.pdf',width=12,height=6)
+lapply(rownames(vl.comb),function(x) {
+		# x=vars.levels[[x]]
+		x=unclass(vl.comb[x,])
 		df=res.models %>% filter(var==x$var)
 
 		level=''
-		if ('level' %in% names(x)) {
+		if ('level' %in% names(x) && !is.na(x$level)) {
 			df=df %>% filter(level==x$level)
 			level=x$level
 		}
@@ -25,7 +37,7 @@ bsAssign('x')
 		ylim=
 
 		legend.position=''
-		if ('legend.position' %in% names(x)) {
+		if ('legend.position' %in% names(x) && !is.na(x$legend.position)) {
 			legend.position=x$legend.position
 		}
 
@@ -39,7 +51,6 @@ bsAssign('x')
 		ycols=c('exp.coef','lower..95','upper..95')
 		ylim=c(min(df[,ycols]),max(df[,ycols]))
 		by(df,df[,'sex'],function(y) {
-bsAssign('y')
 			sex0=y[1,'sex']
 			plotByGroups(y,group.cols=c(NA,'country'),xcol='ord',ycols=ycols,ylim=ylim,
 				colours=colours,ltys=ltys,main=paste(x$var,sex0,level),trends='',legend.position=legend.position)
