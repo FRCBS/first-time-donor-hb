@@ -72,13 +72,17 @@ for (cn in names(colours))
 # reverting that file to an old version from 2026-01-25
 plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c('Estimate','lower','upper'),
 		ltys=list(cm='dashed',fi='solid'),colours=list(Male='blue3',Female='red3'),main='',colour.col='sex',
-		trends='legend',legend.position='',ylim=NULL) {
+		trends='legend',legend.position='',ylim=NULL,extras.fun=NULL,x.max=NA) {
 
+	if (is.na(x.max))
+		x.max=max(data[[xcol]])
+
+print(x.max)
 	xmin=min(data[[xcol]][data[[xcol]]>=0])-1
 	if (is.null(ylim)) 
 		ylim=c(min(data[,ycols]),max(data[,ycols]))
 	yspan=(ylim[2]-ylim[1])
-	plot(x=NULL,xlim=c(xmin,max(data[[xcol]]) + if (trends=='legend') 10 else 0),ylim=c(ylim[1],ylim[2]),
+	plot(x=NULL,xlim=c(xmin,x.max + if (trends=='legend') 10 else 0),ylim=c(ylim[1],ylim[2]),
 		main=if(main!='') main else '',xlab=xcol,ylab=ycols[1])
 	lgnd=by(data,data[,group.cols[!is.na(group.cols)]],function(x) {
 			sex0=x[1,group.cols[1]] 
@@ -156,6 +160,10 @@ plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c(
 
 	if (trends == 'table') {
 		return(do.call(rbind,lgnd))
+	}
+
+	if (!is.null(extras.fun)) {
+		extras.fun()
 	}
 }
 
@@ -345,7 +353,7 @@ getIntervals = function(breaks) {
 #	 and can be a subset of these.
 # *or* with freq != NULL, with the structure of hb.freq
 # Nb! This function operates on a single distribution
-rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL) {
+rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL,hb.decimals=0) {
 	if (is.null(cutoff)) {
 		if (is.null(sex)) {
 			if (is.null(data0)) {
@@ -357,18 +365,18 @@ rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL) 
 	}
 
 	if (!is.null(data0)) {
-		# sex0=data0[data0$Sex==sex&!is.na(data0$Hb)&data0$BloodDonationTypeKey %in% c('Whole Blood (K)','No Donation (E)'),c('Hb')]	
+		# sex0=data0[data0$Sex==sex&!is.na(data0$hb)&data0$BloodDonationTypeKey %in% c('Whole Blood (K)','No Donation (E)'),c('hb')]	
 		freq = data0 %>%
-			group_by(Hb) %>%
+			group_by(hb) %>%
 			summarise(n=n()) %>%
 			mutate(prop=n/sum(n))
 	} else {
 		freq = freq %>%
-			group_by(Hb) %>%
+			group_by(hb) %>%
 			summarise(n=sum(n),.groups='drop')
 	}
 	
-	freq = freq[!is.na(freq$Hb),]
+	freq = freq[!is.na(freq$hb),]
 	
 	if (!'prop' %in% colnames(freq)) {
 		sum.n = sum(freq$n) # -coalesce(freq$nas,0))
@@ -376,38 +384,39 @@ rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL) 
 	}
 	
 	freq.mean = freq %>%
-		filter(!is.na(Hb)) %>% # These are the summary rows for NA; leave them out at this point
-		summarise(n2=sum(n),mean0=sum(Hb*(n))/n2,.groups='drop')
+		filter(!is.na(hb)) %>% # These are the summary rows for NA; leave them out at this point
+		summarise(n2=sum(n),mean0=sum(hb*(n))/n2,.groups='drop')
 	
 	freq.stats = freq %>%
-		filter(!is.na(Hb)) %>% # These are the summary rows for NA; leave them out at this point
-		mutate(dev=Hb-freq.mean$mean0) %>% # ,prop=n/n2) %>%
+		filter(!is.na(hb)) %>% # These are the summary rows for NA; leave them out at this point
+		mutate(dev=hb-freq.mean$mean0) %>% # ,prop=n/n2) %>%
 		group_by() %>%
 		summarise(mean=min(freq.mean$mean0),n0=min(n),var=sum(prop*dev^2),sd=sqrt(var),
 							skewness=sum(prop*(dev/sd)^3),kurtosis=sum(prop*(dev/sd)^4),.groups='drop')
+
 	mean0= freq.stats$mean
 	sd0 = freq.stats$sd
 
-	Hb.values = sort(unique(freq$Hb))
+	hb.values = sort(unique(freq$hb))
 	if (FALSE) {
 		dx <- 1. #depends on units, but should now all be converted to g/L
 	} else	{
-		if (param$hb.decimals == 1){
+		if (hb.decimals == 1){
 			dx <- 0.1 #depends on units, but should now all be converted to g/L
 		} else{
 			dx = 1.
 		}
 	}
-	ndist=dnorm(Hb.values,mean=mean0,sd=sd0)*dx
+	ndist=dnorm(hb.values,mean=mean0,sd=sd0)*dx
 	
 	# Plotting the unchanged distribution
 	if (plot) {
-		plot(prop~Hb,data=freq,type='l',lwd=2)
-		lines(Hb.values,ndist)
+		plot(prop~hb,data=freq,type='l',lwd=2)
+		lines(hb.values,ndist)
 	
 		# A plot showing the difference between the distribution defined by data0 and the
 		# normal distribution estimated from that data
-		plot(freq$prop-ndist~Hb.values)
+		plot(freq$prop-ndist~hb.values)
 		abline(v=cutoff,col='blue')
 		abline(h=c(-1,1)*0.0005,col='red')
 	}
@@ -416,10 +425,10 @@ rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL) 
 	cnt = 0
 	freq2 = freq
 	# cover the case that there is no data at the cutoff value (should not occur with reasonable data volumes)
-	# k = which(freq$Hb==cutoff)
-	k = max(which(freq$Hb<=cutoff))
+	# k = which(freq$hb==cutoff)
+	k = max(which(freq$hb<=cutoff))
 	if (length(k) == 0 || k == -Inf) 
-		k = min(which(freq$Hb>=cutoff))
+		k = min(which(freq$hb>=cutoff))
 	while (TRUE) {
 		diff = (freq2$prop-ndist)[1:(k-1)]
 		wh = which(diff < -0.0005)
@@ -448,30 +457,49 @@ rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL) 
 	}
 
 	mean1 = freq2 %>% 
-			mutate(mom=Hb*prop) %>%
+			mutate(mom=hb*prop) %>%
 			summarise(mean=sum(mom))
 	mean1=as.numeric(mean1)
 	sd1 =	freq2 %>% 
-			mutate(mom=(Hb-as.numeric(mean1))^2*prop) %>%
+			mutate(mom=(hb-as.numeric(mean1))^2*prop) %>%
 			summarise(sdx=sum(mom)) 
 	sd1=sqrt(as.numeric(sd1))
 	
 	# The theoretical deferred proportion is computed here
 	deferred.prop = pnorm(cutoff-0.5,mean1,sd1)
 
-	if (plot) {
-		plot(prop~Hb,data=freq2,type='l',lwd=3,xlim=NULL)
-		lines(prop~Hb,data=freq2,col='green', lwd=2)
-		ndist2=dnorm(Hb.values,mean=mean1,sd=sd1)*dx
-		lines(Hb.values,ndist2,col='red',lty='dotted',lwd=2)
+	if (plot && FALSE) {
+		plot(prop~hb,data=freq2,type='l',lwd=3,xlim=NULL)
+		lines(prop~hb,data=freq2,col='green', lwd=2)
+		ndist2=dnorm(hb.values,mean=mean1,sd=sd1)*dx
+		lines(hb.values,ndist2,col='red',lty='dotted',lwd=2)
 		abline(v=cutoff,col='blue',lty='dashed')
 		rect(mean1-5,0,mean1+5,0.001,col='pink',lwd=2)
 		abline(v=mean1,lty='dotted',lwd=3)
 		
-		plot(freq2$prop-ndist2~Hb.values)
+		plot(freq2$prop-ndist2~hb.values)
 		abline(v=cutoff,col='blue',lty='dashed')
 		abline(h=c(-1,1)*0.0005,col='red',lty='dashed')
 	}
 
-	return(list(dist=freq2,params=list(mean=mean1,sd=sd1,deferred.prop=deferred.prop)))
+	return(list(dist=freq2,params=list(mean0=freq.mean$mean0,mean=mean1,sd=sd1,deferred.prop=deferred.prop)))
+}
+
+firstUp <- function(x) {
+	substr(x,1,1) <- toupper(substr(x,1,1))
+	return(x)
+}
+
+decimalPlaces <- function(x) {
+    if ((x %% 1) != 0) {
+        nchar(strsplit(sub('0+$', '', as.character(x)), ".", fixed=TRUE)[[1]][[2]])
+    } else {
+        return(0)
+    }
+}
+
+subFromList = function(ptrn,lst) {
+	for (nm in names(lst))
+		ptrn=gsub(paste0('¤',nm',lst[[nm]],ptrn)
+	return(ptrn)
 }

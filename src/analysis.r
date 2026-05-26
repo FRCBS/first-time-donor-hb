@@ -1,16 +1,6 @@
 source('src/analysis-functions.r')
 
-vars=c('ord.group.full','bloodgr','sex')
-vars.levels=list(
-	a=list(var='ord.group.full',legend.position='topleft'),
-	b=list(var='bloodgr'),
-	c=list(var='age.group.t',level=c('(15,20]')),
-	c2=list(var='hb.surplus',level=c('bottom 10%')),
-	c3=list(var='hb.surplus',level=c('bottom 10-25%')),
-	d=list(var='bloodgr'))
-# lapply(vars,function(x) {
-
-vars2=c('ord.group.full','bloodgr','age.group.t','hb.surplus')
+vars2=c('ord.group.full','bloodgr','age.group.t','hb.surplus','sex')
 vl.comb=left_join(data.frame(var=vars2),unique((res.models %>% mutate(level=coalesce(level,'-')))[,c('var','level')]),join_by(var))
 singles = vl.comb %>% 
 	group_by(var) %>%
@@ -20,9 +10,16 @@ singles = vl.comb %>%
 vl.comb$level[vl.comb$var %in% unlist(singles)]=NA
 vl.comb$legend.position=NA
 vl.comb$legend.position[1]='topleft'
-x=unclass(vl.comb[1,])
+vl.comb$x.max=NA
+vl.comb[vl.comb$var=='ord.group.full','x.max']=40
+
+hr.plot.extras.fun = function() {
+	abline(h=1,lty='dashed')
+	# abline(v=15.5,lty='dashed')
+}
 
 pdf('results\\survival-joint-with-levels.pdf',width=12,height=6)
+file.pattern='results/survival-joint-¤var-¤sex-¤level.pdf'
 lapply(rownames(vl.comb),function(x) {
 		# x=vars.levels[[x]]
 		x=unclass(vl.comb[x,])
@@ -33,8 +30,6 @@ lapply(rownames(vl.comb),function(x) {
 			df=df %>% filter(level==x$level)
 			level=x$level
 		}
-
-		ylim=
 
 		legend.position=''
 		if ('legend.position' %in% names(x) && !is.na(x$legend.position)) {
@@ -52,10 +47,30 @@ lapply(rownames(vl.comb),function(x) {
 		ylim=c(min(df[,ycols]),max(df[,ycols]))
 		by(df,df[,'sex'],function(y) {
 			sex0=y[1,'sex']
+			x$sex=sex0
+
+			main=paste(x$var,sex0,level)
+
+			local.plot=FALSE
+			if (!is.null(file.pattern) && file.pattern!='') {
+				filename=gsub('[](%,]','_',subFromList(file.pattern,x))
+				local.plot=TRUE
+
+				pdf(filename,width=7,heigh=5)
+				par(mar=c(0.1,5.5,0.5,0.6)) # no space at the top; bottom,left,top,right bottom 2.2->0
+				par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
+				main=''
+			}
+			
 			plotByGroups(y,group.cols=c(NA,'country'),xcol='ord',ycols=ycols,ylim=ylim,
-				colours=colours,ltys=ltys,main=paste(x$var,sex0,level),trends='',legend.position=legend.position)
+				colours=colours,ltys=ltys,main=main,trends='',legend.position=legend.position,
+				extras.fun=hr.plot.extras.fun,x.max=x$x.max)
+
+			if (local.plot)
+				dev.off()
 		})
 	})
+
 dev.off()
 
 res.curves=res.curves %>% arrange(country,ord,sex,time)

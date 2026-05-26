@@ -112,16 +112,59 @@ margins=lapply(margins,function(x) {
 			select(-year.max) 
 	})
 
+annual.hb.dist = annual.hb.dist %>%
+	filter(abs(hb)!=1000000) 
+
+####### rectifyDistributions
+cutoff.list=lapply(names(countries),function(x) {
+	countries[[x]]$param %>%
+		rowwise() %>%
+		filter(grepl('cutoff',name)) %>%
+		mutate(country=x,name=firstUp(sub('cutoff.','',name))) %>%
+		data.frame()
+})
+cutoffs=do.call(rbind,cutoff.list)
+str(cutoffs)
+
+res.list=by(annual.hb.dist,annual.hb.dist[,c('country','sex','year')],function(df) {
+bsAssign('df')
+	df=df[df$data.set=='donation0',]
+	sex0=df$sex[1]
+	country0=df$country[1]
+	year0=df$year[1]
+	cutoff=as.numeric(cutoffs[cutoffs$name==sex0&cutoffs$country==country0,'value'])
+
+	hb.decimals=max(sapply(df$hb,decimalPlaces))
+	rv=rectifyDistribution(data0=NULL,freq=df,cutoff=cutoff,hb.decimals=hb.decimals,plot=FALSE)
+
+	return(data.frame(country=country0,sex=sex0,year=year0,mean0=rv$param$mean0,mean1=rv$param$mean))
+})
+rects=do.call(rbind,res.list)
+rects = rects %>% 
+	inner_join(conversions.df,join_by(country)) %>%
+	mutate(diff=diff*rate)
+rects$diff=rects$mean1-rects$mean0
+
+pdf('results/hb-rectifications.pdf')
+par(mfrow=c(1,2))
+ycols=c('exp.coef','lower..95','upper..95')
+ylim=c(min(rects[,ycols]),max(rects[,ycols]))
+by(rects,rects[,'sex'],function(y) {
+	sex0=y[1,'sex']
+	main=paste(y$var,sex0)
+	plotByGroups(y,group.cols=c(NA,'country'),xcol='year',ycols='diff',ylim=NULL,
+		colours=colours,colour.col='country',trends='',main=main)
+})
+dev.off()
+#######
+
 annual.hb = annual.hb.dist %>%
-	filter(abs(hb)!=1000000) %>%
 	group_by(data.set,sex,country,year) %>%
 	summarise(n.donor=sum(n),hb=sum(hb*n)/sum(n),.groups='drop') # %>%
 	# inner_join(use.years,join_by(country,between(year,y$year.min,y$year.max))) # %>%
 	# select(-year.min) %>%
 	# select(-year.max) %>%
 	data.frame()
-
-# annual.hb0 %>% filter(country=='au')
 
 totals=lapply(names(margins),FUN=function(nm) {
 		margins[[nm]] %>%
@@ -256,31 +299,35 @@ crtn$level=as.character(crtn$level)
 # Hence the correction should include a multiplier of -1.
 # dist.diff can now be used to compute the corrections
 
-crtn.mean=inner_join(dist.diff[dist.diff$data.set=='donation0',],crtn,join_by(country,sex,var,level)) %>%
+crtn.mean0=inner_join(dist.diff[dist.diff$data.set=='donation0',],crtn,join_by(country,sex,var,level)) %>%
 	mutate(correction=-diff*Estimate) %>%
 	dplyr::select(country,data.set,sex,var,level,year,correction) %>%
 	arrange(correction)
+
+crtn.rects=rects %>%
+	mutate(data.set='donation0',correction=diff,var='rectification',level=0) %>%
+	dplyr::select(!!!syms(colnames(crtn.mean)))
+
+crtn.mean=rbind(crtn.mean,crtn.rects)
+
+str(crtn.mean)
+str(rects)
 
 crtn.annual=crtn.mean %>%
 	group_by(country,data.set,sex,year) %>%
 	summarise(correction=sum(correction),.groups='drop') %>%
 	data.frame()
-plot(crtn.annual$correction)
+# plot(crtn.annual$correction)
 
 conversions.df=data.frame(t(data.frame(conversions)))
 colnames(conversions.df)='rate'
 conversions.df$country=rownames(conversions.df)
 
-plotByGroups(crtn.annual,group.cols=c('sex','country'),xcol='year',ycols=c('correction'),colours=list(Male='blue3',Female='red3'))
-
-# 2026-05-25
-# use.years=annual.hb %>%
-#	group_by(country) %>%
-#	summarise(year.min=min(year)+2,year.max=max(year)-1,.groups='drop')
+# plotByGroups(crtn.annual,group.cols=c('sex','country'),xcol='year',ycols=c('correction'),colours=list(Male='blue3',Female='red3'))
 
 hb.dummy=annual.hb %>%
 	filter(data.set=='donation0') %>%
-	inner_join(conversions.df,join_by(country)) %>%
+	inner_join(conversions.df,join_by(country)) %>% # nb! are the conversions applied again?
 	mutate(hb=rate*hb) # %>%
 	# inner_join(use.years,join_by(country,between(year,y$year.min,y$year.max))) %>%
 	# select(-year.min) %>%
@@ -288,22 +335,14 @@ hb.dummy=annual.hb %>%
 
 plotByGroups(hb.dummy,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=list(Male='blue3',Female='red3'))
 
-#crtn.annual = crtn.annual %>%
-#	inner_join(use.years,join_by(country,between(year,y$year.min,y$year.max))) %>%
-#	select(-year.min) %>%
-#	select(-year.max)
-
 hb.cmp=inner_join(crtn.annual,hb.dummy,join_by(data.set,sex,country,year,)) %>%
 	mutate(hb=hb+correction,country=paste0(country,'-corrected')) %>%
 	select(!!!syms(colnames(hb.dummy))) %>%
 	rbind(hb.dummy)
-# ?between
-	# dplyr::filter(year>=2002,year<2024) # 2026-02-08 nb! must filter each country based on their own years
-# nb! must do the conversion properly as well
-hb.cmp %>% filter(country=='fi') %>% summarize(min(year))
-crtn.annual %>% filter(country=='fi') %>% summarize(min(year))
 
-source('src/analysis-functions.r')
+# hb.cmp %>% filter(country=='fi') %>% summarize(min(year))
+# crtn.annual %>% filter(country=='fi') %>% summarize(min(year))
+# source('src/analysis-functions.r')
 
 pdf('results/trends-corrected.pdf',width=12)
 sms=plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=colours,colour.col='country',trends='table')
@@ -323,7 +362,6 @@ if (length(wh) > 0) {
 	trends.table$p.value[wh]=paste0('¤',trends.table$p.value[wh],'%')
 }
 
-# xt=xtable(trends.table)
 html.table=paste(capture.output(print(xtable(trends.table,digits=5),type='html',include.rownames=FALSE)),collapse='\n')
 html.table=gsub('¤([^%]+)%','<b>\\1</b>',html.table)
 cat(gsub('¤([^%]+)%','<b>\\1</b>',html.table))
@@ -335,6 +373,7 @@ cat(html.table)
 
 ### Table of the correction by sex, country, year and variable (month,hour,age)
 ctb=crtn.mean %>%
+	arrange(country,year,var) %>%
 	group_by(country,year,sex,var) %>%
 	summarise(crtn=sum(correction),.groups='drop')
 
