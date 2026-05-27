@@ -306,12 +306,10 @@ crtn.mean0=inner_join(dist.diff[dist.diff$data.set=='donation0',],crtn,join_by(c
 
 crtn.rects=rects %>%
 	mutate(data.set='donation0',correction=diff,var='rectification',level=0) %>%
+	inner_join(use.years,join_by(country,between(year,y$year.min,y$year.max))) %>%
 	dplyr::select(!!!syms(colnames(crtn.mean)))
 
-crtn.mean=rbind(crtn.mean,crtn.rects)
-
-str(crtn.mean)
-str(rects)
+crtn.mean=rbind(crtn.mean0,crtn.rects)
 
 crtn.annual=crtn.mean %>%
 	group_by(country,data.set,sex,year) %>%
@@ -375,10 +373,104 @@ cat(html.table)
 ctb=crtn.mean %>%
 	arrange(country,year,var) %>%
 	group_by(country,year,sex,var) %>%
-	summarise(crtn=sum(correction),.groups='drop')
+	summarise(crtn=sum(correction),.groups='drop') %>%
+	rowwise() %>%
+	mutate(country=cn.names[[country]])
+	# sapply(cn.ids,FUN=function(cn) { paste0(cn.names[[cn]])})
 
-ctb2=pivot_wider(ctb,values_from='crtn',names_from='var')
+ctb2=pivot_wider(ctb %>% mutate(crtn=round(crtn,2)),values_from='crtn',names_from='var')
 ctb3=full_join(ctb2 %>% filter(sex == 'Female'),ctb2 %>% filter(sex == 'Male'),join_by(country,year))
-write.xlsx(ctb3,file='results/corrections.xlsx')
+colnames(ctb3)=sub('\\.[xy]$','',colnames(ctb3))
+colnames(ctb3)=sub('rectification','rect',colnames(ctb3))
+ctb3=rbind(colnames(ctb3),data.frame(ctb3))
+ctb3
+# write.xlsx(ctb3,file='results/corrections.xlsx')
+
+# copied from donor-recruitment-prediction/analysis-script.r and modified
+#  - etd$year0 is the vertical axis
+#  - etd$cdon is the value to be printed
+#  - etd$x is the horizontal axis
+# i specifies the colour
+# the rows represent the individual cells
+# all can be done at once
+# maybe ctb3 must 
+plot.et.data = function(etd,col.widths=NULL,hadj=0,bold.first.row=TRUE) {
+	# etd=vls.df
+	ncols=length(table(etd$x))
+	if (is.null(col.widths)) 
+		col.widths=rep(1,ncols)
+
+	cumwd=cumsum(col.widths)
+	start.offset=cumwd-col.widths
+	
+	etd$x0=start.offset[etd$x] # 0.5+
+	etd$x1=etd$x0+col.widths[etd$x]
+
+	if (length(hadj) < ncols) {
+		hadj=c(hadj,rep(0.5,ncols-length(hadj)))
+	}
+
+	etd$hadj=hadj[etd$x]
+
+	if (nrow(etd)==0) {
+		print('returning')
+		return()
+	}
+
+	# etd$x-0.5, etd$x-0.5+1
+	rect(etd$x0,etd$y-0.5,etd$x1,etd$y-0.5+1,col=col_vector[etd$col],border='white')
+	# etd$x, (etd$x0+etd$x1)/2
+	# text((etd$x0+etd$x1)/2,etd$y,labels=etd$value,cex=0.75)
+
+	etd$font=0
+	if (bold.first.row)
+		etd$font[etd$y==1]=2
+
+	by(etd,etd[,c('hadj','font')],function(etd.by) {
+bsAssign('etd.by')
+		# text((etd.by$x0+etd.by$x1)/2,etd.by$y,labels=etd.by$value,cex=0.75,adj=c(etd.by$hadj[1],0.5),font=etd.by$font[1]) # 1 
+
+		ha=etd.by$hadj[1]
+		text((1-ha)*etd.by$x0+ha*etd.by$x1,etd.by$y,labels=etd.by$value,cex=0.75,font=etd.by$font[1]) # 1 
+		# text(etd.by$x0,etd.by$y,labels=etd.by$value,cex=0.75) # round(etd$value,1) # ,adj=c(etd.by$hadj[1],0.5)
+	})
+}
+
+library(RColorBrewer)
+
+# ctb4=ctb3
+# ctb4$y=1:nrow(ctb3)
+inx=expand.grid(row=1:nrow(ctb3),col=1:ncol(ctb3))
+vls=lapply(1:nrow(inx),function(x) data.frame(y=inx[x,'row'],x=inx[x,'col'],value=as.character(ctb3[inx[x,'row'],inx[x,'col']])))
+vls.df=do.call(rbind,vls)
+vls.df[1:10,]
+vls.df$col=NA
+
+col.minus=colorRampPalette(colors=c('red','white'))(30)
+col.plus=colorRampPalette(colors=c('white','blue'))(30)
+col_vector=c(col.minus,col.plus[-1],'lightgray')
+
+abs.max=max(abs(min(ctb$crtn)),abs(max(ctb$crtn)))
+value.seq=seq(from=-abs.max,to=abs.max,len=length(col_vector))
+wh=which(grepl('^-?[0-9](\\.[0-9]+)?$',vls.df$value))
+cols=left_join(data.frame(value=as.numeric(vls.df$value[wh])),data.frame(inx=1:length(value.seq),tb=value.seq),join_by(closest(x$value<y$tb))) %>% 
+	dplyr::select(inx) %>%
+	unlist()
+vls.df$col[wh]=cols
+vls.df$col[-wh]=length(col_vector)
+
+####
+col.widths=c(2,rep(1,11))
+
+pdf('results/heatmap.pdf',height=nrow(ctb3)*5/25.4,width=7)
+par(mar=c(0.1,1,0.0,0.0)) # bottom,left,top,right bottom 2.2->0
+par(mai=c(0,0,0,0))
+plot(NULL,xlim=c(0,sum(col.widths)),ylim=rev(c(1-0.5,nrow(ctb3)+0.5)),axes=FALSE,xaxs = "i",yaxs = "i")
+plot.et.data(vls.df,col.widths,hadj=0.5) # )
+# rect(0,1,sum(col.widths),nrow(ctb3),lwd=3,col='red')
+dev.off()
+
+# pdata=pivot_longer(dfdona,cols=starts_with('X'),names_to='year',names_prefix='X',values_to='donations') %>%
+# pivot_longer(ctb3,cols=colnames(ctb3),names_to=
 
 # nb! Should produce the heatmap tables in R instead to make it automatic

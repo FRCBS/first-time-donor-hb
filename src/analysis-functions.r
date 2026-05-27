@@ -77,7 +77,6 @@ plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c(
 	if (is.na(x.max))
 		x.max=max(data[[xcol]])
 
-print(x.max)
 	xmin=min(data[[xcol]][data[[xcol]]>=0])-1
 	if (is.null(ylim)) 
 		ylim=c(min(data[,ycols]),max(data[,ycols]))
@@ -500,6 +499,6 @@ decimalPlaces <- function(x) {
 
 subFromList = function(ptrn,lst) {
 	for (nm in names(lst))
-		ptrn=gsub(paste0('¤',nm',lst[[nm]],ptrn)
+		ptrn=gsub(paste0('¤',nm),lst[[nm]],ptrn)
 	return(ptrn)
 }
