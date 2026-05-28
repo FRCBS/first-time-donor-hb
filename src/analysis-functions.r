@@ -72,18 +72,19 @@ for (cn in names(colours))
 # reverting that file to an old version from 2026-01-25
 plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c('Estimate','lower','upper'),
 		ltys=list(cm='dashed',fi='solid'),colours=list(Male='blue3',Female='red3'),main='',colour.col='sex',
-		trends='legend',legend.position='',ylim=NULL,extras.fun=NULL,x.max=NA) {
+		trends='legend',legend.position='',y.lim=NULL,extras.fun=NULL,x.max=NA) {
 
 	if (is.na(x.max))
 		x.max=max(data[[xcol]])
 
 	xmin=min(data[[xcol]][data[[xcol]]>=0])-1
-	if (is.null(ylim)) 
-		ylim=c(min(data[,ycols]),max(data[,ycols]))
-	yspan=(ylim[2]-ylim[1])
-	plot(x=NULL,xlim=c(xmin,x.max + if (trends=='legend') 10 else 0),ylim=c(ylim[1],ylim[2]),
+	if (is.null(y.lim)) 
+		y.lim=c(min(data[,ycols]),max(data[,ycols]))
+	yspan=(y.lim[2]-y.lim[1])
+	plot(x=NULL,xlim=c(xmin,x.max + if (trends=='legend') 10 else 0),ylim=c(y.lim[1],y.lim[2]),
 		main=if(main!='') main else '',xlab=xcol,ylab=ycols[1])
 	lgnd=by(data,data[,group.cols[!is.na(group.cols)]],function(x) {
+bsAssign('x')
 			sex0=x[1,group.cols[1]] 
 			country0=x[1,group.cols[2]] 
 

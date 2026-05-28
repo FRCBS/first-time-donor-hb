@@ -1,5 +1,6 @@
-setwd('c:/hy-version/first-time-donor-hb')
+# TODO must create 
 
+setwd('c:/hy-version/first-time-donor-hb')
 source('src/analysis-functions.r')
 
 ## ----parameters,echo=FALSE----------------------------------------------------
@@ -127,7 +128,6 @@ cutoffs=do.call(rbind,cutoff.list)
 str(cutoffs)
 
 res.list=by(annual.hb.dist,annual.hb.dist[,c('country','sex','year')],function(df) {
-bsAssign('df')
 	df=df[df$data.set=='donation0',]
 	sex0=df$sex[1]
 	country0=df$country[1]
@@ -156,16 +156,14 @@ by(rects,rects[,'sex'],function(y) {
 		colours=colours,colour.col='country',trends='',main=main)
 })
 dev.off()
-#######
+####### rectifyDistributions ends
 
 annual.hb = annual.hb.dist %>%
 	group_by(data.set,sex,country,year) %>%
 	summarise(n.donor=sum(n),hb=sum(hb*n)/sum(n),.groups='drop') # %>%
-	# inner_join(use.years,join_by(country,between(year,y$year.min,y$year.max))) # %>%
-	# select(-year.min) %>%
-	# select(-year.max) %>%
 	data.frame()
 
+# These are the total number of donations by country, sex and dataset (for each margin separately)
 totals=lapply(names(margins),FUN=function(nm) {
 		margins[[nm]] %>%
 			group_by(country,data.set,sex) %>%
@@ -174,6 +172,7 @@ totals=lapply(names(margins),FUN=function(nm) {
 	})
 names(totals)=names(margins)
 
+# These are the total number of donations by country, sex and *year* and dataset (for each margin separately)
 totals.year=lapply(names(margins),FUN=function(nm) {
 		margins[[nm]] %>%
 			group_by(country,data.set,sex,year) %>%
@@ -182,6 +181,8 @@ totals.year=lapply(names(margins),FUN=function(nm) {
 	})
 names(totals.year)=names(margins)
 
+# This is a single distribution (proportions/density) of the totals (by margin still)
+# and country, data.set, level, sex
 dist=lapply(names(margins),FUN=function(nm) {
 		margins[[nm]] %>%
 			group_by(country,data.set,sex,!!!syms(nm)) %>%
@@ -193,6 +194,8 @@ dist=lapply(names(margins),FUN=function(nm) {
 	})
 dist=do.call(rbind,dist)
 
+# This is a single distribution (proportions/density) of the totals (by margin still)
+# and country, data.set, level, sex
 dist.year=lapply(names(margins),FUN=function(nm) {
 		margins[[nm]] %>%
 			group_by(country,data.set,sex,year,!!!syms(nm)) %>%
@@ -205,28 +208,36 @@ dist.year=lapply(names(margins),FUN=function(nm) {
 dist.year=do.call(rbind,dist.year)
 
 # Test plot for the distributions
+if (FALSE) {
 plot(x=NULL,xlim=c(-1,12),ylim=c(0,0.20))
-yd=dist.year %>% filter(data.set=='donation0',sex=='Male',var=='month')
-yd0=dist %>% filter(data.set=='donation0',sex=='Male',var=='month') %>%
+	yd=dist.year %>% filter(data.set=='donation0',sex=='Male',var=='month')
+	yd0=dist %>% filter(data.set=='donation0',sex=='Male',var=='month') %>%
 			mutate(level.num=as.numeric(level)) %>%
 			arrange(level.num)
 
-by(yd,yd[,c('country','year','sex')],function(x) {
+	by(yd,yd[,c('country','year','sex')],function(x) {
 		x=x%>%
 			mutate(level.num=as.numeric(level)) %>%
 			arrange(level.num)
 
 		lines(x$level,x$prop)
 	})
-lines(yd0$level,yd0$prop,col='red3',lwd=3)
+	lines(yd0$level,yd0$prop,col='red3',lwd=3)
+}
 
+# These are the differences between the mean proportions and overall means
 dist.diff=inner_join(dist.year,dist,join_by(country,data.set,sex,var,level),suffix=c('','0')) %>%
 	mutate(diff=prop-prop0)
 
-pdf('results/margins.pdf')
+plot.old.style=FALSE
+# pdf('results/margins.pdf')
+pdf('results/hb-margins-levels.pdf',width=12,height=6)
+file.pattern='results/hb-¤phase-¤margin-¤sex.pdf'
 mar.res=list()
+# xlab closer to the axis
+# https://stackoverflow.com/questions/30265728/in-r-base-plot-move-axis-label-closer-to-axis
 for (nm in names(margins)) {
-	# print(paste('****',nm))
+	# Here, the comparison between monitored hb levels and annual means happens
 	df=inner_join(margins[[nm]],annual.hb,join_by(country,sex,year,data.set)) %>% 
 		filter(data.set=='donation0') %>% 
 		mutate(hb.dev=mean-hb)
@@ -241,7 +252,7 @@ for (nm in names(margins)) {
 			frml.char=paste0('hb.dev~',nm,'+0')
 			m=lm(formula(frml.char),weights=n,data=x)
 			sm=summary(m)
-			# print(sm)
+
 			df=data.frame(sm$coeff)
 			tv=-qt(0.025,df=sm$df[2])
 			df=data.frame(country=x$country[1],sex=x$sex[1],var=nm,level=as.integer(sub(nm,'',rownames(df))),df,
@@ -251,35 +262,158 @@ for (nm in names(margins)) {
 		})
 	var.data=do.call(rbind,rlist)
 
+	# 2026-05-27 conversions done here as well
 	for (cn in names(conversions)) {
 		convert.cols=c('Estimate','Std..Error','lower','upper')
 		var.data[var.data$country==cn,convert.cols]= conversions[[cn]]*var.data[var.data$country==cn,convert.cols]
 	}
 
-	pp.cols=list(Male='blue3',Female='red3')
-	xmin=min(var.data$level[var.data$level>=0])-1
-	plot(x=NULL,xlim=c(xmin,max(var.data$level)),ylim=c(min(var.data$lower),max(var.data$upper)),
-		main=paste(nm),xlab=nm,ylab='deviation from mean hb')
-	by(var.data,var.data[,c('country','sex')],function(x) {
-			sex0=x$sex[1]
+	if (plot.old.style) {
+		# pp.cols=list(Male='blue3',Female='red3') # not needed anymore
+		xmin=min(var.data$level[var.data$level>=0])-1
+		plot(x=NULL,xlim=c(xmin,max(var.data$level)),ylim=c(min(var.data$lower),max(var.data$upper)),
+			main=paste(nm),xlab=nm,ylab='deviation from mean hb')
+		by(var.data,var.data[,c('country','sex')],function(x) {
+				sex0=x$sex[1]
+				country0=x$country[1]
+
+				# col0=pp.cols[[sex0]]
+				col0=colours[[country0]]
+
+				wh = which(x$level==-1)
+				if (length(wh) > 0) {
+					x0=min(x$level[-wh])-1+0.1*if(sex0=='Male') 0.2 else 0
+					arrows(x0,x$lower[wh],x0,x$Estimate[wh],length=0.05,angle=90,code=1,col=col0,lwd=1.5)
+					arrows(x0,x$Estimate[wh],x0,x$upper[wh],length=0.05,angle=90,code=2,col=col0,lwd=1.5)
+					points(x0,x$Estimate[wh],pch=pchs[[sex0]],col=col0)
+					x=x[-wh,]
+				}
+
+				lines(x$level,x$Estimate,col=col0,lwd=2,lty=if (sex0=='Female') 'solid' else 'dashed') # ltys[[sex0]])
+				# lines(x$level,x$upper,col=col0,lwd=1,lty='dashed')
+				# lines(x$level,x$lower,col=col0,lwd=1,lty='dashed')
+			})
+	}
+
+	# Copy from below - not optimal but should suffice
+	par(mfrow=c(1,2))
+	ylim=lim=c(min(var.data[,'Estimate']),max(var.data[,'Estimate']))
+	by(var.data,var.data$sex,function(y) {
+		if (nm == 'age') 
+			y = y %>% filter(level<=65)
+
+		sex0=y$sex[1]
+			
+		local.plot=FALSE
+		main=paste(nm,sex0)
+		if (!is.null(file.pattern) && file.pattern!='') {
+			# file.pattern='hb-¤phase-¤margin-¤sex.pdf'
+			param=list(phase='margins',margin=nm,sex=sex0)
+			filename=gsub('[](%,]','_',subFromList(file.pattern,param))
+			local.plot=TRUE
+
+			pdf(filename,width=7,heigh=5)
+			# par(mar=c(0.1,5.5,0.5,0.6)) # no space at the top; bottom,left,top,right bottom 2.2->0
+			par(mar=c(4.1,4.1,.1,0.1)) # no space at the top; bottom,left,top,right bottom 2.2->0
+			par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
+			main=''
+		}
+
+		xlim=as.numeric(c(min(y[,'level']),max(y[,'level'])))
+
+		ylim=c(min(y[,'Estimate']),max(y[,'Estimate']))
+		plot(NULL,xlim=xlim,ylim=ylim,ylab='hb',xlab=nm,main=main)
+		by (y,y$country,function(x) {
+			x$level=as.integer(x$level)
+
+			# sex0=x$sex[1]
 			country0=x$country[1]
 
-			# col0=pp.cols[[sex0]]
 			col0=colours[[country0]]
 
 			wh = which(x$level==-1)
 			if (length(wh) > 0) {
-				x0=min(x$level[-wh])-1+0.1*if(sex0=='Male') 0.2 else 0
+				x0=0 # min(x$level[-wh])-1+0.1*if(sex0=='Male') 0.2 else 0
 				arrows(x0,x$lower[wh],x0,x$Estimate[wh],length=0.05,angle=90,code=1,col=col0,lwd=1.5)
 				arrows(x0,x$Estimate[wh],x0,x$upper[wh],length=0.05,angle=90,code=2,col=col0,lwd=1.5)
 				points(x0,x$Estimate[wh],pch=pchs[[sex0]],col=col0)
 				x=x[-wh,]
 			}
 
-			lines(x$level,x$Estimate,col=col0,lwd=2,lty=if (sex0=='Female') 'solid' else 'dashed') # ltys[[sex0]])
-			# lines(x$level,x$upper,col=col0,lwd=1,lty='dashed')
-			# lines(x$level,x$lower,col=col0,lwd=1,lty='dashed')
+			lines(x$level,x$Estimate,col=col0,lwd=2)
 		})
+
+		if (local.plot) 
+			dev.off()
+	})
+	# dev.off()
+
+	# pdf('results/hb-levels.pdf')
+	par(mfrow=c(1,2))
+	
+	marnm=margins[[nm]] %>%
+		filter(data.set=='donation0') %>%
+		mutate(level=as.integer(!!!syms(nm))) %>%
+		inner_join(conversions.df,join_by(country)) %>%
+		mutate(mean=mean*rate)
+
+	by(marnm,marnm$sex,function(y) {
+		sex0=y$sex[1]
+		y = y %>% 
+			# filter(data.set=='donation0') %>%
+			# mutate(level=as.integer(!!!syms(nm))) %>%
+			group_by(country,level) %>%
+			summarise(mean=sum(n*mean)/sum(n),.groups='drop') %>%
+			# inner_join(conversions.df,join_by(country)) %>%
+			# mutate(mean=mean*rate) %>%
+			arrange(country,level) %>%
+			data.frame()
+
+		if (nm == 'age') 
+			y = y %>% filter(level<=65)
+			
+		local.plot=FALSE
+		main=paste(nm,sex0)
+		if (!is.null(file.pattern) && file.pattern!='') {
+			# file.pattern='hb-¤phase-¤margin-¤sex.pdf'
+			param=list(phase='levels',margin=nm,sex=sex0)
+			filename=gsub('[](%,]','_',subFromList(file.pattern,param))
+			local.plot=TRUE
+
+			pdf(filename,width=7,heigh=5)
+			par(mar=c(4.1,4.1,.1,0.1)) # no space at the top; bottom,left,top,right bottom 2.2->0
+			par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
+			main=''
+		}
+
+		xlim=as.numeric(c(min(y[,'level']),max(y[,'level'])))
+		ylim=c(min(y[,'mean']),max(y[,'mean']))
+
+		plot(NULL,xlim=xlim,ylim=ylim,ylab='hb',xlab=nm,main=main)
+		by (y,y$country,function(x) {
+			x$level=as.integer(x$level)
+
+			# sex0=x$sex[1]
+			country0=x$country[1]
+
+			col0=colours[[country0]]
+
+			wh = which(x$level==-1)
+			if (length(wh) > 0) {
+				x0=0 # min(x$level[-wh])-1+0.1*if(sex0=='Male') 0.2 else 0
+				# arrows(x0,x$lower[wh],x0,x$Estimate[wh],length=0.05,angle=90,code=1,col=col0,lwd=1.5)
+				# arrows(x0,x$Estimate[wh],x0,x$upper[wh],length=0.05,angle=90,code=2,col=col0,lwd=1.5)
+				points(x0,x$mean[wh],pch=pchs[[sex0]],col=col0)
+				x=x[-wh,]
+			}
+
+			lines(x$level,x$mean,col=col0,lwd=2)
+		})
+
+		if (local.plot) 
+			dev.off()
+	})
+	# dev.off()
 
 	mar.res[[nm]]=var.data
 }
