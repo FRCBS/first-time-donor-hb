@@ -142,17 +142,16 @@ res.list=by(annual.hb.dist,annual.hb.dist[,c('country','sex','year')],function(d
 rects=do.call(rbind,res.list)
 rects = rects %>% 
 	inner_join(conversions.df,join_by(country)) %>%
-	mutate(diff=diff*rate)
-rects$diff=rects$mean1-rects$mean0
+	mutate(diff=mean1-mean0,diff=diff*rate)
 
 pdf('results/hb-rectifications.pdf')
 par(mfrow=c(1,2))
-ycols=c('exp.coef','lower..95','upper..95')
+ycols='diff'# c('exp.coef','lower..95','upper..95')
 ylim=c(min(rects[,ycols]),max(rects[,ycols]))
 by(rects,rects[,'sex'],function(y) {
 	sex0=y[1,'sex']
 	main=paste(y$var,sex0)
-	plotByGroups(y,group.cols=c(NA,'country'),xcol='year',ycols='diff',ylim=NULL,
+	plotByGroups(y,group.cols=c(NA,'country'),xcol='year',ycols='diff', # ylim=NULL,
 		colours=colours,colour.col='country',trends='',main=main)
 })
 dev.off()
@@ -233,6 +232,7 @@ plot.old.style=FALSE
 # pdf('results/margins.pdf')
 pdf('results/hb-margins-levels.pdf',width=12,height=6)
 file.pattern='results/hb-¤phase-¤margin-¤sex.pdf'
+file.pattern=''
 mar.res=list()
 # xlab closer to the axis
 # https://stackoverflow.com/questions/30265728/in-r-base-plot-move-axis-label-closer-to-axis
@@ -441,7 +441,7 @@ crtn.mean0=inner_join(dist.diff[dist.diff$data.set=='donation0',],crtn,join_by(c
 crtn.rects=rects %>%
 	mutate(data.set='donation0',correction=diff,var='rectification',level=0) %>%
 	inner_join(use.years,join_by(country,between(year,y$year.min,y$year.max))) %>%
-	dplyr::select(!!!syms(colnames(crtn.mean)))
+	dplyr::select(!!!syms(colnames(crtn.mean0)))
 
 crtn.mean=rbind(crtn.mean0,crtn.rects)
 
@@ -450,11 +450,6 @@ crtn.annual=crtn.mean %>%
 	summarise(correction=sum(correction),.groups='drop') %>%
 	data.frame()
 # plot(crtn.annual$correction)
-
-conversions.df=data.frame(t(data.frame(conversions)))
-colnames(conversions.df)='rate'
-conversions.df$country=rownames(conversions.df)
-
 # plotByGroups(crtn.annual,group.cols=c('sex','country'),xcol='year',ycols=c('correction'),colours=list(Male='blue3',Female='red3'))
 
 hb.dummy=annual.hb %>%
@@ -465,7 +460,7 @@ hb.dummy=annual.hb %>%
 	# select(-year.min) %>%
 	# select(-year.max)
 
-plotByGroups(hb.dummy,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=list(Male='blue3',Female='red3'))
+# plotByGroups(hb.dummy,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=list(Male='blue3',Female='red3'))
 
 hb.cmp=inner_join(crtn.annual,hb.dummy,join_by(data.set,sex,country,year,)) %>%
 	mutate(hb=hb+correction,country=paste0(country,'-corrected')) %>%

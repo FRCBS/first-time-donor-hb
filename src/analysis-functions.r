@@ -17,9 +17,14 @@ colfun = function(x) {
 
 conversions=list()
 conversions$fi=1
+conversions$fr=10
 conversions$nl=10 / 0.6206
 conversions$nc=10
 conversions$au=1
+
+conversions.df=data.frame(t(data.frame(conversions)))
+colnames(conversions.df)='rate'
+conversions.df$country=rownames(conversions.df)
 
 cn.names=list()
 cn.names$fi='Finland'
