@@ -342,7 +342,7 @@ plotSurvivalCurvesByCountry = function(cn) {
 	dev.off()
 }
 
-convertOutput = function(html,file) {
+convertOutput = function(html,file,page.width=20) {
 	if (param$figure.format == 'png') {
 		cat(html,file)
 	} else {
@@ -378,7 +378,7 @@ bsAssign('html.file')
 			tex=gsub('9cm','16cm',tex)
 		}
 
-		tex.pre='\\documentclass[varwidth=20cm,border=2mm]{standalone}\n\\usepackage[pdftex]{color,graphicx}\n\\begin{document} \\begin{center}'
+		tex.pre=paste0('\\documentclass[varwidth=',page.width,'cm,border=2mm]{standalone}\n\\usepackage[pdftex]{color,graphicx}\n\\begin{document} \\begin{center}')
 
 		wd=sub('^(.+[/\\]).+','\\1',file)
 		bare.file=sub(wd,'',file,fixed=TRUE)
@@ -462,7 +462,7 @@ rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL,h
 	ndist=dnorm(hb.values,mean=mean0,sd=sd0)*dx
 	
 	# Plotting the unchanged distribution
-	if (plot) {
+	if (plot && FALSE) {
 		plot(prop~hb,data=freq,type='l',lwd=2)
 		lines(hb.values,ndist)
 	
@@ -516,15 +516,38 @@ rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL,h
 			mutate(mom=(hb-as.numeric(mean1))^2*prop) %>%
 			summarise(sdx=sum(mom)) 
 	sd1=sqrt(as.numeric(sd1))
+
+bsAssign('freq')
+bsAssign('freq2')
+bsAssign('cutoff')
+bsAssign('mean0')
+bsAssign('mean1')
+bsAssign('hb.values')
+bsAssign('sd1')
 	
 	# The theoretical deferred proportion is computed here
 	deferred.prop = pnorm(cutoff-0.5,mean1,sd1)
 
-	if (plot && FALSE) {
+	if (plot) {
+		par(mar=c(4,4,0.5,0.6)) # no space at the top; bottom,left,top,right bottom 2.2->0
+		plot(prop~hb,data=freq2,type='l',lwd=3,col='red3',xlim=NULL)
+		abline(v=cutoff,col='limegreen',lty='dashed')
+		lines(freq$hb,freq$prop,lwd=2,col='black')
+
+		abline(v=mean0,col='red3',lty='dashed')
+		abline(v=mean1,col='black',lty='dashed')
+
+		ndist2=dnorm(hb.values,mean=mean1,sd=sd1)*dx
+		lines(hb.values,ndist2,col='red3',lty='dotted',lwd=2)
+	}
+
+	if (FALSE) {
 		plot(prop~hb,data=freq2,type='l',lwd=3,xlim=NULL)
-		lines(prop~hb,data=freq2,col='green', lwd=2)
+		# lines(prop~hb,data=freq2,col='green', lwd=2)
+
 		ndist2=dnorm(hb.values,mean=mean1,sd=sd1)*dx
 		lines(hb.values,ndist2,col='red',lty='dotted',lwd=2)
+
 		abline(v=cutoff,col='blue',lty='dashed')
 		rect(mean1-5,0,mean1+5,0.001,col='pink',lwd=2)
 		abline(v=mean1,lty='dotted',lwd=3)
@@ -557,9 +580,9 @@ subFromList = function(ptrn,lst) {
 }
 
 latexCompile = function(content,workdir,filename) {
-# bsAssign('content')
-# bsAssign('workdir')
-# bsAssign('filename')
+bsAssign('content')
+bsAssign('workdir')
+bsAssign('filename')
 	oldwd = getwd()
 	setwd(workdir)
 

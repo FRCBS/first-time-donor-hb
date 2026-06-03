@@ -127,7 +127,8 @@ cutoff.list=lapply(names(countries),function(x) {
 cutoffs=do.call(rbind,cutoff.list)
 str(cutoffs)
 
-res.list=by(annual.hb.dist,annual.hb.dist[,c('country','sex','year')],function(df) {
+plot.rects=FALSE
+rectifyOuter = function(df) {
 	df=df[df$data.set=='donation0',]
 	sex0=df$sex[1]
 	country0=df$country[1]
@@ -135,10 +136,12 @@ res.list=by(annual.hb.dist,annual.hb.dist[,c('country','sex','year')],function(d
 	cutoff=as.numeric(cutoffs[cutoffs$name==sex0&cutoffs$country==country0,'value'])
 
 	hb.decimals=max(sapply(df$hb,decimalPlaces))
-	rv=rectifyDistribution(data0=NULL,freq=df,cutoff=cutoff,hb.decimals=hb.decimals,plot=FALSE)
+	rv=rectifyDistribution(data0=NULL,freq=df,cutoff=cutoff,hb.decimals=hb.decimals,plot=plot.rects)
 
 	return(data.frame(country=country0,sex=sex0,year=year0,mean0=rv$param$mean0,mean1=rv$param$mean))
-})
+}
+
+res.list=by(annual.hb.dist,annual.hb.dist[,c('country','sex','year')],rectifyOuter)
 rects=do.call(rbind,res.list)
 rects = rects %>% 
 	inner_join(conversions.df,join_by(country)) %>%
@@ -146,7 +149,7 @@ rects = rects %>%
 
 pdf('results/hb-rectifications.pdf')
 par(mfrow=c(1,2))
-ycols='diff'# c('exp.coef','lower..95','upper..95')
+ycols='diff'
 ylim=c(min(rects[,ycols]),max(rects[,ycols]))
 by(rects,rects[,'sex'],function(y) {
 	sex0=y[1,'sex']
@@ -155,6 +158,15 @@ by(rects,rects[,'sex'],function(y) {
 		colours=colours,colour.col='country',trends='',main=main)
 })
 dev.off()
+
+# source('src/analysis-functions.r')
+pdf('results/rectify-distribution-sample.pdf',width=6)
+sample.data=annual.hb.dist %>% filter(country=='fi',sex=='Female',year==2013)
+plot.rects=TRUE
+rectifyOuter(sample.data)
+plot.rects=FALSE
+dev.off()
+
 ####### rectifyDistributions ends
 
 annual.hb = annual.hb.dist %>%
@@ -471,8 +483,8 @@ hb.cmp=inner_join(crtn.annual,hb.dummy,join_by(data.set,sex,country,year,)) %>%
 # crtn.annual %>% filter(country=='fi') %>% summarize(min(year))
 # source('src/analysis-functions.r')
 
-pdf('results/trends-corrected.pdf',width=8)
-par(mar=c(0.1,5.5,0.5,0.6)) # no space at the top; bottom,left,top,right bottom 2.2->0
+pdf('results/trends-corrected.pdf',width=12)
+par(mar=c(4,4,0.5,0.6)) # no space at the top; bottom,left,top,right bottom 2.2->0
 sms=plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=colours,colour.col='country',trends='table')
 dev.off()
 

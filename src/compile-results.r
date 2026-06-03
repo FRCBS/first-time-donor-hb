@@ -51,11 +51,27 @@ convertOutput(html.file,file=paste0(param$shared.dir,'figure-h heatmaps.html'))
 #### trends
 
 # age month hour / levels and margins
-html.table.ml='<table><tr>
-<td><img width=1800 src="../results/trends-corrected"></td> </tr>
+html.table.t='<table><tr>
+<td><img width=1800 src="../results/trends-corrected.pdf"></td> </tr>
 </table>'
 
 captions$figure.t="<b>Figure T</b> Mean and corrected hemoglobin levels. <br>Fitted trend lines have been added where there is a statistically significant trend."
 
-html.file=sub('¤table¤',paste(html.table.ml,if(include.captions) captions$figure.t else '',sep='\n'),html.template)
+html.file=sub('¤table¤',paste(html.table.t,if(include.captions) captions$figure.t else '',sep='\n'),html.template)
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-t trends.html'))
+
+# example rectification
+html.table.r='<table><tr>
+<td><img width=900 src="../results/rectify-distribution-sample.pdf"></td> </tr>
+</table>'
+
+captions$figure.r="<b>Figure R</b> Example of hemoglobin distribution: Finland, year 2013, females. 
+The black line shows the original distribution with an artefact caused by remeasurement after an 
+initial measurement below the cutoff value (125 g/L, green vertical line). 
+The post-rectification distribution is drawn in red. The mean values of the original and rectified 
+distributions are illustrated with black and red, respectively, vertical dashed lines. 
+The normal distribution following the mean and standard deviation of the rectified distribution is 
+illustrated with red, dotted line."
+
+html.file=sub('¤table¤',paste(html.table.r,if(include.captions) captions$figure.r else '',sep='\n'),html.template)
+convertOutput(html.file,file=paste0(param$shared.dir,'figure-r rectification.html'),page.width=10)
