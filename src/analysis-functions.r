@@ -89,7 +89,6 @@ plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c(
 	plot(x=NULL,xlim=c(xmin,x.max + if (trends=='legend') 10 else 0),ylim=c(y.lim[1],y.lim[2]),
 		main=if(main!='') main else '',xlab=xcol,ylab=ycols[1])
 	lgnd=by(data,data[,group.cols[!is.na(group.cols)]],function(x) {
-bsAssign('x')
 			sex0=x[1,group.cols[1]] 
 			country0=x[1,group.cols[2]] 
 
@@ -259,7 +258,6 @@ plotSurvivalCurvesByCountry = function(cn) {
 	
 	pdf(paste0('results/survival-figures-',cn,'.pdf'))
 	by(res.models.all,res.models.all[,c('sex','var')],function(y) {
-	bsAssign('y')
 		if (length(unique(y$level))==1)
 			y$level='general'
 
@@ -342,6 +340,55 @@ plotSurvivalCurvesByCountry = function(cn) {
 			return(data.frame(sex=df$sex[1],ord=df$ord[1],var=rownames(sm$coeff),sm$coeff,lower=sm$coeff[,1]-tv*sm$coeff[,2],upper=sm$coeff[,1]+tv*sm$coeff[,2]))
 		})
 	dev.off()
+}
+
+convertOutput = function(html,file) {
+	if (param$figure.format == 'png') {
+		cat(html,file)
+	} else {
+bsAssign('html.file')
+		html.0=html.file
+		tex=sub('.+[<]body[>]','',html.file)
+		tex=gsub('[<]table[>].tr.','\\\\begin{tabular}{cc}',tex)
+		tex=gsub('[<]/table[>]','\\\\end{tabular}\n\\\\end{center}\n',tex)
+		tex=gsub('[<]/tr[>][<]tr[>]','\\\\\\\\\n',tex)
+		tex=gsub('[<]/td[>][\n ]*[<]td[^>]*[>]',' & ',tex)
+		# tex=gsub('[<]/td[>][\n ]*[^>]+td[^>]*[>]',' & ',tex)
+		tex=gsub('[<]/tr[>]','\\\\\\\\\n',tex)
+		tex=gsub('[<]b[>](.+)[<]/b[>]','\\\\textbf{\\1}',tex)
+		tex=gsub('[<]/body[>].+','\n\\\\end{document}',tex)
+		tex=gsub('&nbsp;','\\\\ ',tex)
+		tex=gsub('&frac12;','$\\\\frac{1}{2}$',tex)
+		tex=gsub('&ndash;','--',tex)
+		tex=gsub('~','\\\\sim',tex)
+		tex=gsub('&middot;','\\\\cdot',tex)
+		tex=gsub('(log|exp)[(]','\\\\\\1(',tex)
+		tex=gsub('src=.([^>]+).[>]','>\\\\includegraphics[width=9cm]{\\1}',tex)
+
+		if (grepl('1800',html.0)) 
+			tex=gsub('width=9cm','width=18cm',tex)
+
+		tex=gsub('[.]png','.pdf',tex)
+		tex=gsub('[<]span[>]([^<]+)[<]/span[>]','\\$\\1\\$',tex)
+		tex=gsub('[<][^>]+[>]','',tex)
+
+
+		if (!grepl('end.center',tex)) {
+			tex=sub('.textbf','\\\\end{center}\n\\\\textbf',tex)
+			tex=gsub('9cm','16cm',tex)
+		}
+
+		tex.pre='\\documentclass[varwidth=20cm,border=2mm]{standalone}\n\\usepackage[pdftex]{color,graphicx}\n\\begin{document} \\begin{center}'
+
+		wd=sub('^(.+[/\\]).+','\\1',file)
+		bare.file=sub(wd,'',file,fixed=TRUE)
+		bare.file=sub('.html','.tex',bare.file)
+		tex=paste(tex.pre,tex,collapse='\n')
+		latexCompile(tex,param$shared.dir,bare.file)
+	}
+
+	suffix=c('aux','log','tex')
+	dev.null=sapply(suffix,FUN=function(x) file.remove(sub('[.][a-z]+$',paste0('.',x),file)) )
 }
 
 getIntervals = function(breaks) {
@@ -507,4 +554,20 @@ subFromList = function(ptrn,lst) {
 	for (nm in names(lst))
 		ptrn=gsub(paste0('¤',nm),lst[[nm]],ptrn)
 	return(ptrn)
+}
+
+latexCompile = function(content,workdir,filename) {
+# bsAssign('content')
+# bsAssign('workdir')
+# bsAssign('filename')
+	oldwd = getwd()
+	setwd(workdir)
+
+	tex.file = sub('.pdf$','.tex',filename)
+
+	pdflatex = 'C:\\Users\\super\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\pdflatex.exe'
+
+	cat(content,file=tex.file)
+	system(paste(pdflatex,paste0('"',tex.file,'"')),intern=TRUE)
+	setwd(oldwd)
 }

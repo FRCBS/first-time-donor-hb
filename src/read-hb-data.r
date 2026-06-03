@@ -471,7 +471,8 @@ hb.cmp=inner_join(crtn.annual,hb.dummy,join_by(data.set,sex,country,year,)) %>%
 # crtn.annual %>% filter(country=='fi') %>% summarize(min(year))
 # source('src/analysis-functions.r')
 
-pdf('results/trends-corrected.pdf',width=12)
+pdf('results/trends-corrected.pdf',width=8)
+par(mar=c(0.1,5.5,0.5,0.6)) # no space at the top; bottom,left,top,right bottom 2.2->0
 sms=plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=colours,colour.col='country',trends='table')
 dev.off()
 
@@ -523,17 +524,22 @@ ctb3
 # the rows represent the individual cells
 # all can be done at once
 # maybe ctb3 must 
-plot.et.data = function(etd,col.widths=NULL,hadj=0,bold.first.row=TRUE) {
+plot.et.data = function(etd,cwds=NULL,hadj=0,bold.first.row=TRUE) {
+bsAssign('etd')
+bsAssign('cwds')
+bsAssign('hadj')
+bsAssign('bold.first.row')
+
 	# etd=vls.df
 	ncols=length(table(etd$x))
-	if (is.null(col.widths)) 
-		col.widths=rep(1,ncols)
+	if (is.null(cwds)) 
+		cwds=rep(1,ncols)
 
-	cumwd=cumsum(col.widths)
-	start.offset=cumwd-col.widths
+	cumwd=cumsum(cwds)
+	start.offset=cumwd-cwds
 	
 	etd$x0=start.offset[etd$x] # 0.5+
-	etd$x1=etd$x0+col.widths[etd$x]
+	etd$x1=etd$x0+cwds[etd$x]
 
 	if (length(hadj) < ncols) {
 		hadj=c(hadj,rep(0.5,ncols-length(hadj)))
@@ -556,12 +562,8 @@ plot.et.data = function(etd,col.widths=NULL,hadj=0,bold.first.row=TRUE) {
 		etd$font[etd$y==1]=2
 
 	by(etd,etd[,c('hadj','font')],function(etd.by) {
-bsAssign('etd.by')
-		# text((etd.by$x0+etd.by$x1)/2,etd.by$y,labels=etd.by$value,cex=0.75,adj=c(etd.by$hadj[1],0.5),font=etd.by$font[1]) # 1 
-
 		ha=etd.by$hadj[1]
 		text((1-ha)*etd.by$x0+ha*etd.by$x1,etd.by$y,labels=etd.by$value,cex=0.75,font=etd.by$font[1]) # 1 
-		# text(etd.by$x0,etd.by$y,labels=etd.by$value,cex=0.75) # round(etd$value,1) # ,adj=c(etd.by$hadj[1],0.5)
 	})
 }
 
@@ -595,9 +597,37 @@ pdf('results/heatmap.pdf',height=nrow(ctb3)*5/25.4,width=7)
 par(mar=c(0.1,1,0.0,0.0)) # bottom,left,top,right bottom 2.2->0
 par(mai=c(0,0,0,0))
 plot(NULL,xlim=c(0,sum(col.widths)),ylim=rev(c(1-0.5,nrow(ctb3)+0.5)),axes=FALSE,xaxs = "i",yaxs = "i")
-plot.et.data(vls.df,col.widths,hadj=0.5) # )
-# rect(0,1,sum(col.widths),nrow(ctb3),lwd=3,col='red')
+plot.et.data(vls.df,col.widths,hadj=0.5)
 dev.off()
+
+country.y=unique(vls.df[,c('value','y')] %>% filter(value %in% cn.names))
+lbc=vls.df %>%
+	left_join(country.y,join_by(y),suffix=c('','.country'))
+
+source('src/plot.et.data-draft.r')
+
+by(lbc,lbc$value.country,function(x) {
+bsAssign('x')
+	if (nrow(x) == 1)
+		return(NULL)
+
+	cn=x$value[1]
+
+	y0=min(x$y)
+	x$y=2+x$y-y0
+	x=rbind(vls.df[vls.df$y==1,],x[,-ncol(x)]) %>% 
+		filter(x>1)
+	x$x=x$x-1
+
+	col.widths.sg=col.widths[-1]
+
+	pdf(paste0('results/heatmap-',cn,'.pdf'),height=max(x$y)*5/25.4,width=6)
+	par(mar=c(0.1,1,0.0,0.0)) # bottom,left,top,right bottom 2.2->0
+	par(mai=c(0,0,0,0))
+	plot(NULL,xlim=c(0,sum(col.widths.sg)),ylim=rev(c(1-0.5,max(x$y)+0.5)),axes=FALSE,xaxs = "i",yaxs = "i")
+	plot.et.data(x,col.widths.sg,hadj=0.5)
+	dev.off()
+})
 
 # pdata=pivot_longer(dfdona,cols=starts_with('X'),names_to='year',names_prefix='X',values_to='donations') %>%
 # pivot_longer(ctb3,cols=colnames(ctb3),names_to=
