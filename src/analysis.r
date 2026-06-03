@@ -43,6 +43,9 @@ lapply(rownames(vl.comb),function(x) {
 			df$sex='Female'
 		}
 
+		if (!is.na(x$x.max)) 
+			df=df %>% filter(ord<=x$x.max)
+
 		ycols=c('exp.coef','lower..95','upper..95')
 		ylim=c(min(df[,ycols]),max(df[,ycols]))
 		by(df,df[,'sex'],function(y) {
@@ -53,16 +56,19 @@ lapply(rownames(vl.comb),function(x) {
 
 			local.plot=FALSE
 			if (!is.null(file.pattern) && file.pattern!='') {
-				filename=gsub('[](%,]','_',subFromList(file.pattern,x))
+				filename=gsub('[](%,]','-',subFromList(file.pattern,x))
+				filename=gsub(' ','-',filename)
+
 				local.plot=TRUE
 
 				pdf(filename,width=7,heigh=5)
-				par(mar=c(0.1,5.5,0.5,0.6)) # no space at the top; bottom,left,top,right bottom 2.2->0
+				# par(mar=c(0.1,5.5,0.5,0.6)) # no space at the top; bottom,left,top,right bottom 2.2->0
+				par(mar=c(4.1,4.1,0.2,0.1)) # modifired measures with left and bottom margins for labels and some at top for y-axis labels
 				par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
 				main=''
 			}
 			
-			plotByGroups(y,group.cols=c(NA,'country'),xcol='ord',ycols=ycols,ylim=ylim,
+			plotByGroups(y,group.cols=c(NA,'country'),xcol='ord',ycols=ycols,y.lim=ylim,
 				colours=colours,ltys=ltys,main=main,trends='',legend.position=legend.position,
 				extras.fun=hr.plot.extras.fun,x.max=x$x.max)
 
@@ -121,6 +127,7 @@ by(fitted,fitted$ord,function(x) {
 	})
 })
 dev.off()
+
 pdf('results\\survival-joint-curves.pdf')
 by(fitted,fitted$ord,function(x) {
 	# plot here
@@ -140,10 +147,45 @@ by(fitted,fitted$ord,function(x) {
 })
 dev.off()
 
+# In single files, separately for males and females
+# pdf('results\\survival-joint-curves.pdf')
+fitted.116=fitted %>% filter(ord %in% c(1,16))
+by(fitted.116,fitted.116$ord,function(x) {
+	# plot here
+	ord0=x$ord[1]
+
+	by(x,x[,c('sex')],function(y) {
+		sex0=y$sex[1]
+		pdf(paste0('results/survival-curves-',ord0,'-',sex0,'.pdf'),width=7,height=5.5)
+		par(mar=c(4.1,4.1,0.2,0.1)) # modifired measures with left and bottom margins for labels and some at top for y-axis labels
+		par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
+		plot(x=NULL,xlim=c(0,2*365),ylim=c(0,1),main='',ylab='survival',xlab='time') # main=x$ord[1]
+		by(y,y$country,function(z) {
+			country0=z$country[1]
+			sex0=z$sex[1]
+			col=colours[[country0]]
+			# pch=pchs[[sex0]]
+
+			lines(fitted~time,data=z,col=col,lwd=2,lty='dotted')
+			lines(surv~time,data=z,col=col,lwd=2) # ,lty=if (sex0=='Female') 'solid' else '8282')
+		})
+		dev.off()
+	})
+})
+# dev.off()
+
 pdf('results/survival-parameters.pdf')
 # plotParameters(ce)
 # list(Male='blue3',Female='red3')
+		par(mar=c(4.1,4.1,0.2,0.1)) # modifired measures with left and bottom margins for labels and some at top for y-axis labels
+		par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
 plotParameters2(ce,xvar='log_alpha',yvar='yf',group.by=c('country','sex'),col.var='country',pp.cols=colours,shade.var='ord')
 dev.off()
 
 sapply(unique(res.models$country),plotSurvivalCurvesByCountry)
+
+cairo_pdf('results/survival-sample-age.group.t-fi-female.pdf',width=7,heigh=5)
+par(mar=c(4.1,4.1,0.2,0.1)) # modifired measures with left and bottom margins for labels and some at top for y-axis labels
+par(cex=1.10,cex.axis=1.10,cex.lab=1.10)
+plotSurvivalCurvesByCountry('fi',plot.what='figures',filters=list(sex='Female',var='age.group.t'),pdf.internal=FALSE,draw.confint=FALSE)
+dev.off()

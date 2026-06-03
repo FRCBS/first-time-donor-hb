@@ -251,13 +251,26 @@ tr:nth-child(even) {
 
 # Copied the main bits from post-export-plotting.r
 # The idea is to produce the single-country survival plots 
-plotSurvivalCurvesByCountry = function(cn) {
+plotSurvivalCurvesByCountry = function(cn,pdf.internal=TRUE,plot.what='all',filters=list(),draw.confint=TRUE) {
 	res.models.all = res.models %>% filter(country==cn)
 	res.curves = res.curves %>% filter(country==cn)
 	# country=res.models.all$country[1]
+
+bsAssign('res.models.all')
+	for (fr in names(filters)) {
+		print(paste(fr,filters[[fr]]))
+		res.models.all = res.models.all[res.models.all[[fr]]==filters[[fr]],]
+		# res.models.all = res.models.all %>%
+		#	filter(!!!syms(fr)==filters[[fr]])
+		str(res.models.all)
+	}
 	
-	pdf(paste0('results/survival-figures-',cn,'.pdf'))
+	if (pdf.internal)
+		pdf(paste0('results/survival-figures-',cn,'.pdf'))
 	by(res.models.all,res.models.all[,c('sex','var')],function(y) {
+		if (plot.what != 'all' && plot.what != 'figures')
+			return(NULL)
+
 		if (length(unique(y$level))==1)
 			y$level='general'
 
@@ -269,8 +282,8 @@ plotSurvivalCurvesByCountry = function(cn) {
 		ylim=c(min(y$exp.coef,na.rm=TRUE),max(y$exp.coef,na.rm=TRUE)) #c(0.70,1.40)
 		y.delta=ylim[2]-ylim[1]
 		ylim=c(ylim[1]-0.3*y.delta,ylim[2]+0.2*y.delta)
-		plot(x=NULL,type='n',xlim=c(1,max(y$ord)),ylim=ylim,main=paste(y$sex[1],y$var[1]),
-			xlab='number of donation',ylab='relative likelihood of donation')
+		plot(x=NULL,type='n',xlim=c(1,max(y$ord)),ylim=ylim,main=if (pdf.internal) paste(y$sex[1],y$var[1]) else '',
+			xlab='number of donations',ylab='relative likelihood of next donation')
 		abline(h=1,lwd=1,lty='dashed')
 		breaks=y$breaks[1]
 
@@ -280,8 +293,8 @@ plotSurvivalCurvesByCountry = function(cn) {
 
 		col.fun=function(x) {if (x %in% names(colours)) colours[[x]] else 'white'}
 
-		if (max(y$ord) == param$max.ord.group.number+1) 
-			abline(v=max(y$ord)-0.5,lwd=1,lty='dashed')
+		# if (max(y$ord) == param$max.ord.group.number+1) 
+		#	abline(v=max(y$ord)-0.5,lwd=1,lty='dashed')
 
 		brk.labels=if (breaks!='-') rev(getIntervals(breaks)) else ''
 		if (length(brk.labels) > 1) {
@@ -294,7 +307,13 @@ plotSurvivalCurvesByCountry = function(cn) {
 			fill=sapply(levels,col.fun)
 			levels=levels[fill!='white']
 			fill=fill[fill!='white']
-			legend(x='bottomright',legend=paste(levels,brk.labels),fill=sapply(levels,col.fun))
+			lt0=paste(levels,brk.labels)
+bsAssign('lt0')
+			if (grepl('^.([0-9]+),([0-9]+).',lt0[1])) {
+				lt0=sub('.([0-9]+),([0-9]+). ','\\1<age≤\\2',lt0)
+				print(lt0)
+			}
+			legend(x='bottom',legend=lt0,fill=sapply(levels,col.fun),ncol=4,bg='white')
 		}
 
 		res.void=by(y,y[,c('var','level')],function(x) {
@@ -304,14 +323,22 @@ plotSurvivalCurvesByCountry = function(cn) {
 					return(NULL)
 				ordint=x$ord
 				lines(ordint,x$exp.coef,lwd=2,col=col)
-				lines(ordint,x$lower..95,lwd=2,lty='dotted',col=col)
-				lines(ordint,x$upper..95,lwd=2,lty='dotted',col=col)
+
+				if (draw.confint) {
+					lines(ordint,x$lower..95,lwd=2,lty='dotted',col=col)
+					lines(ordint,x$upper..95,lwd=2,lty='dotted',col=col)
+				}
 			})
 		})
-	dev.off()
+	if (pdf.internal)
+		dev.off()
 
-	pdf(paste0('results/survival-curves-',cn,'.pdf'))
+	if (pdf.internal)
+		pdf(paste0('results/survival-curves-',cn,'.pdf'))
 	dummy=by(res.curves,res.curves[,c('sex','ord')],function(df) {
+		if (plot.what != 'all' && plot.what != 'curves')
+			return(NULL)
+
 			wh=min(which(df$surv<0.99))
 			len0=length(df$surv)
 			df=df[wh:len0,]
@@ -339,7 +366,9 @@ plotSurvivalCurvesByCountry = function(cn) {
 			tv=qt(0.025,df=sm$df[2])
 			return(data.frame(sex=df$sex[1],ord=df$ord[1],var=rownames(sm$coeff),sm$coeff,lower=sm$coeff[,1]-tv*sm$coeff[,2],upper=sm$coeff[,1]+tv*sm$coeff[,2]))
 		})
-	dev.off()
+
+	if (pdf.internal)
+		dev.off()
 }
 
 convertOutput = function(html,file,page.width=20) {
@@ -574,8 +603,11 @@ decimalPlaces <- function(x) {
 }
 
 subFromList = function(ptrn,lst) {
-	for (nm in names(lst))
+	for (nm in names(lst)) {
+		if (is.na(lst[[nm]]))
+			lst[[nm]]='NA'
 		ptrn=gsub(paste0('¤',nm),lst[[nm]],ptrn)
+	}
 	return(ptrn)
 }
 

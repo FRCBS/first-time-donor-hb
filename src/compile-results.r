@@ -25,7 +25,7 @@ html.table.ml='<table><tr>
 captions$figure.ml="<b>Figure ML</b> Levels and estimated deviations by age and sex"
 
 html.file=sub('¤table¤',paste(html.table.ml,if(include.captions) captions$figure.ml else '',sep='\n'),html.template)
-convertOutput(html.file,file=paste0(param$shared.dir,'figure-ml model specifications.html'))
+convertOutput(html.file,file=paste0(param$shared.dir,'figure-ml levels margins.html'))
 
 ### heatmaps
 
@@ -75,3 +75,71 @@ illustrated with red, dotted line."
 
 html.file=sub('¤table¤',paste(html.table.r,if(include.captions) captions$figure.r else '',sep='\n'),html.template)
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-r rectification.html'),page.width=10)
+
+#### Table 1
+table1=annual.hb %>%
+	filter(data.set=='donation0') %>%
+	group_by(country,year) %>%
+	summarise(n=sum(n.donor)/1000,.groups='drop') %>%
+	left_join(data.frame(use.years,hit=''),join_by(country,between(year,y$year.min,y$year.max))) %>%
+	mutate(n=paste0(n,hit),n=sub('(.+)NA','(\\1)',n)) %>%
+	dplyr::select(country,year,n) %>%
+	pivot_wider(names_from='country',values_from='n') %>%
+	arrange(year) %>%
+	data.frame()
+colnames(table1)[-1]=sapply(colnames(table1)[-1],function(x) cn.names[[x]])
+table1[,1]=as.character(table1[,1])
+
+html.table1=paste(capture.output(print(xtable(table1,align=c('l',rep('r',ncol(table1)-0))),type='html',include.rownames=FALSE)),collapse='\n')
+html.table1=gsub('&amp;','&',html.table1)
+caption='<b>Table 1</b> Number of new donors per country and year. Years with their number in parentheses were not used in the analysis.'
+html.file=sub('¤table¤',paste0(caption,'\n',html.table1),html.template)
+cat(html.file,file=paste0(param$shared.dir,'table-1.html'))
+
+##### survival
+
+# relative curves
+
+html.table.s='<table><tr>
+<td><img width=500 src="../results/survival-joint-ord.group.full-Female-NA.png"></td>
+<td><img width=500 src="../results/survival-joint-ord.group.full-Male-NA.png"></td> </tr><tr>
+
+<td><img width=500 src="../results/survival-joint-bloodgr-Female-NA.png"></td>
+<td><img width=500 src="../results/survival-joint-bloodgr-Male-NA.png"></td> </tr><tr>
+
+<td><img width=500 src="../results/survival-joint-age.group.t-Female--15-20-.png"></td>
+<td><img width=500 src="../results/survival-joint-age.group.t-Male--15-20-.png"></td> </tr><tr>
+
+<td><img width=500 src="../results/survival-joint-hb.surplus-Female-bottom-10-.png"></td>
+<td><img width=500 src="../results/survival-joint-hb.surplus-Male-bottom-10-.png"></td> </tr><tr>
+
+<td><img width=500 src="../results/survival-joint-hb.surplus-Female-bottom-10-.png"></td>
+<td><img width=500 src="../results/survival-joint-hb.surplus-Male-bottom-10-.png"></td> </tr><tr>
+
+<td><img width=500 src="../results/survival-joint-sex-Female-NA.png"></td>
+<td><img width=500 src="../results/survival-sample-age.group.t-fi-female.png"></td> </tr>
+
+</table>'
+
+captions$figure.s="<b>Figure S</b> Relative retention by various various groups: (a) ..."
+
+html.file=sub('¤table¤',paste(html.table.s,if(include.captions) captions$figure.s else '',sep='\n'),html.template)
+convertOutput(html.file,file=paste0(param$shared.dir,'figure-s relative survival.html'))
+
+# curves
+
+html.table.c='<table><tr>
+<td><img width=500 src="../results/survival-curves-1-Female.png"></td>
+<td><img width=500 src="../results/survival-curves-1-Male.png"></td> </tr><tr>
+
+<td><img width=500 src="../results/survival-curves-16-Female.png"></td>
+<td><img width=500 src="../results/survival-curves-16-Male.png"></td> </tr><tr>
+
+<td><img width=500 src="../results/survival-parameters.png"></td>
+
+</table>'
+
+captions$figure.c="<b>Figure C</b> Survival as a function of time for (a)&nbsp;1 and (b)&nbsp;16 previous donations. "
+
+html.file=sub('¤table¤',paste(html.table.c,if(include.captions) captions$figure.c else '',sep='\n'),html.template)
+convertOutput(html.file,file=paste0(param$shared.dir,'figure-c curves.html'))

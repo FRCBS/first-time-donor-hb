@@ -160,7 +160,7 @@ by(rects,rects[,'sex'],function(y) {
 dev.off()
 
 # source('src/analysis-functions.r')
-pdf('results/rectify-distribution-sample.pdf',width=6)
+pdf('results/rectify-distribution-sample.pdf',width=6,height=5)
 sample.data=annual.hb.dist %>% filter(country=='fi',sex=='Female',year==2013)
 plot.rects=TRUE
 rectifyOuter(sample.data)
@@ -504,12 +504,12 @@ if (length(wh) > 0) {
 
 html.table=paste(capture.output(print(xtable(trends.table,digits=5),type='html',include.rownames=FALSE)),collapse='\n')
 html.table=gsub('¤([^%]+)%','<b>\\1</b>',html.table)
-cat(gsub('¤([^%]+)%','<b>\\1</b>',html.table))
+# cat(gsub('¤([^%]+)%','<b>\\1</b>',html.table))
 
-caption='Estimated trends by country and sex for both corrected and uncorrected annual hemoglobin mean values'
+caption='<b>Table 2</b> Estimated trends by country and sex for both corrected and uncorrected annual hemoglobin mean values'
 html.file=sub('¤table¤',paste0(caption,'\n',html.table),html.template)
-cat(html.file,file=paste0('results/','trends.html'))
-cat(html.table)
+cat(html.file,file=paste0('submit/','table-2 trends.html'))
+# cat(html.table)
 
 ### Table of the correction by sex, country, year and variable (month,hour,age)
 ctb=crtn.mean %>%
