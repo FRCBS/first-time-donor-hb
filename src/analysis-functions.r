@@ -173,7 +173,8 @@ plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c(
 
 # nb! should use the similar implementation in the previous project to enable easier and more parametric
 # plotting with countries etc.
-plotParameters2 = function(ce,xvar='log_alpha',yvar='yf',col.var='sex',group.by=c('country','sex'),pp.cols=list(Male='blue3',Female='red3'),shade.var='ord') {
+plotParameters2 = function(ce,xvar='log_alpha',yvar='yf',col.var='sex',
+	group.by=c('country','sex'),pp.cols=list(Male='blue3',Female='red3'),shade.var='ord',ylim=NULL) {
 	lims = ce %>% 
 		group_by(var) %>%
 		summarise(min=min(Estimate),max=max(Estimate)) %>%
@@ -181,10 +182,11 @@ plotParameters2 = function(ce,xvar='log_alpha',yvar='yf',col.var='sex',group.by=
 	rownames(lims)=lims$var
 	lims$var=NULL
 
-	# plot(x=NULL,xlim=c(-3,-1),ylim=c(0,0.33),xlab='exponent',ylab='asymptote')
-	plot(x=NULL,xlim=t(lims[xvar,]),ylim=t(lims[yvar,]),xlab='exponent',ylab='asymptote')
+	if (is.null(ylim)) 
+		ylim=t(lims[yvar,])
+
+	plot(x=NULL,xlim=t(lims[xvar,]),ylim=ylim,xlab='exponent',ylab='asymptote')
 	by(ce,ce[,group.by],function(x) {
-	# for (gr in names(pp.cols)) {
 		xdata=x %>%
 			# filter(as.character(!!!syms(col.var))==gr,var==xvar) %>%
 			filter(var==xvar) %>%
@@ -211,6 +213,16 @@ plotParameters2 = function(ce,xvar='log_alpha',yvar='yf',col.var='sex',group.by=
 		arrows(xdata$lower,ydata$Estimate,xdata$Estimate,ydata$Estimate,length=0.05,angle=90,code=3,col=col0)
 		arrows(xdata$Estimate,ydata$Estimate,xdata$upper,ydata$Estimate,length=0.05,angle=90,code=3,col=col0)
 	})
+
+		cn.ids=sort(unique(ce$country))
+		cn.ids=cn.ids[!grepl('corrected',cn.ids)]
+		legend.text=sapply(cn.ids,FUN=function(cn) {paste0(cn.names[[cn]])})
+		legend.text=c(legend.text,names(pchs))
+		legend.fill=c(unlist(sapply(cn.ids,FUN=colfun)),rep(NA,length(pchs)))
+		legend.pchs=c(rep(NA,length(cn.ids)),unlist(pchs))
+		legend.border=c(rep('black',length(cn.ids)),rep(NA,length(pchs)))
+		legend('topright',fill=legend.fill,legend=legend.text,pch=legend.pchs,border=legend.border)
+
 }
 
 html.template="<!DOCTYPE html>
@@ -384,7 +396,7 @@ bsAssign('html.file')
 		tex=gsub('[<]/td[>][\n ]*[<]td[^>]*[>]',' & ',tex)
 		# tex=gsub('[<]/td[>][\n ]*[^>]+td[^>]*[>]',' & ',tex)
 		tex=gsub('[<]/tr[>]','\\\\\\\\\n',tex)
-		tex=gsub('[<]b[>](.+)[<]/b[>]','\\\\textbf{\\1}',tex)
+		tex=gsub('[<]b[>]([^<]+)[<]/b[>]','\\\\textbf{\\1}',tex)
 		tex=gsub('[<]/body[>].+','\n\\\\end{document}',tex)
 		tex=gsub('&nbsp;','\\\\ ',tex)
 		tex=gsub('&frac12;','$\\\\frac{1}{2}$',tex)
@@ -394,6 +406,7 @@ bsAssign('html.file')
 		tex=gsub('(log|exp)[(]','\\\\\\1(',tex)
 		tex=gsub('src=.([^>]+).[>]','>\\\\includegraphics[width=9cm]{\\1}',tex)
 
+		# 1800 is used to code two-column graphics
 		if (grepl('1800',html.0)) 
 			tex=gsub('width=9cm','width=18cm',tex)
 
@@ -545,21 +558,13 @@ rectifyDistribution = function (data0,sex=NULL,cutoff=NULL,plot=TRUE,freq=NULL,h
 			mutate(mom=(hb-as.numeric(mean1))^2*prop) %>%
 			summarise(sdx=sum(mom)) 
 	sd1=sqrt(as.numeric(sd1))
-
-bsAssign('freq')
-bsAssign('freq2')
-bsAssign('cutoff')
-bsAssign('mean0')
-bsAssign('mean1')
-bsAssign('hb.values')
-bsAssign('sd1')
 	
 	# The theoretical deferred proportion is computed here
 	deferred.prop = pnorm(cutoff-0.5,mean1,sd1)
 
 	if (plot) {
 		par(mar=c(4,4,0.5,0.6)) # no space at the top; bottom,left,top,right bottom 2.2->0
-		plot(prop~hb,data=freq2,type='l',lwd=3,col='red3',xlim=NULL)
+		plot(prop~hb,data=freq2,type='l',lwd=3,col='red3',xlim=NULL,xlab='hemoglobin (g/L)',ylab='probability density')
 		abline(v=cutoff,col='limegreen',lty='dashed')
 		lines(freq$hb,freq$prop,lwd=2,col='black')
 

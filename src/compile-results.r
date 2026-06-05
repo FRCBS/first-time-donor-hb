@@ -5,6 +5,9 @@ captions=list()
 
 # age month hour / levels and margins
 html.table.ml='<table><tr>
+<td><b>Female</b></td>
+<td><b>Male</b></td> </tr><tr>
+
 <td><img width=500 src="../results/hb-levels-age-Female.png"></td>
 <td><img width=500 src="../results/hb-levels-age-Male.png"></td> </tr><tr>
 <td><img width=500 src="../results/hb-margins-age-Female.png"></td>
@@ -22,7 +25,8 @@ html.table.ml='<table><tr>
 
 </table>'
 
-captions$figure.ml="<b>Figure ML</b> Levels and estimated deviations by age and sex"
+captions$figure.ml="<b>Figure ML</b> Levels and estimated deviations by age and sex 
+(females on left, males on right). See legend for colours in top-left panel."
 
 html.file=sub('¤table¤',paste(html.table.ml,if(include.captions) captions$figure.ml else '',sep='\n'),html.template)
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-ml levels margins.html'))
@@ -126,7 +130,7 @@ captions$figure.s="<b>Figure S</b> Relative retention by various various groups:
 html.file=sub('¤table¤',paste(html.table.s,if(include.captions) captions$figure.s else '',sep='\n'),html.template)
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-s relative survival.html'))
 
-# curves
+# curves and parameters
 
 html.table.c='<table><tr>
 <td><img width=500 src="../results/survival-curves-1-Female.png"></td>
@@ -135,11 +139,91 @@ html.table.c='<table><tr>
 <td><img width=500 src="../results/survival-curves-16-Female.png"></td>
 <td><img width=500 src="../results/survival-curves-16-Male.png"></td> </tr><tr>
 
-<td><img width=500 src="../results/survival-parameters.png"></td>
+<td><img width=500 src="../results/survival-parameters-Female.png"></td>
+<td><img width=500 src="../results/survival-parameters-Male.png"></td> </tr>
 
 </table>'
 
-captions$figure.c="<b>Figure C</b> Survival as a function of time for (a)&nbsp;1 and (b)&nbsp;16 previous donations. "
+captions$figure.c="<b>Figure C</b> Survival as a function of time for (a)&nbsp;1 and 
+(b)&nbsp;16 previous donations. Data for females on the left and males on the right. Top row: retention after
+first donation. Second row: retention after 16 or more donations. Legend for colours in bottom row. While there are significant differences 
+between blood establishments in retention after first donation, the differences tend to vanish with 
+increasing number of donations. This phenomenon can also be seen from the parameter estimates at the bottom 
+row, where the trajectories converge towards the bottom-right corner for all blood establishments."
 
 html.file=sub('¤table¤',paste(html.table.c,if(include.captions) captions$figure.c else '',sep='\n'),html.template)
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-c curves.html'))
+
+# table 1 (for survival)
+
+# nb! 
+getCountriesStats = function(var) {
+	stats.list=lapply(names(countries),function(x) {
+		countries[[x]][[var]] %>%
+			# rowwise() %>%
+			# filter(grepl('cutoff',name)) %>%
+			mutate(country=x,var=var) %>%
+			data.frame()
+	})
+	stats=do.call(rbind,stats.list)
+
+	wh=which(grepl('age',colnames(stats)))
+	if (length(wh) > 0) 
+		colnames(stats)[wh]='age' # hack
+	return(stats)
+}
+
+stats.age=getCountriesStats('stats.age')
+stats.age.t=getCountriesStats('stats.age.t')
+stats.ord=getCountriesStats('stats.ord')
+
+str(stats.age)
+
+# number of donors by sex
+st.donor= stats.ord %>%
+	group_by(country,sex,var) %>%
+	filter(ord==1) %>%
+	summarise(value=max(n),.groups='drop') %>%
+	mutate(var='Donors (in 1,000)',value=as.character(value/1000)) %>%
+	pivot_wider(names_from='country',values_from='value')
+
+# number of donations
+st.donations=stats.ord %>%
+	group_by(country,sex,var) %>%
+	# filter(ord==1) %>%
+	summarise(value=sum(n),.groups='drop') %>%
+	mutate(var='Donations (in 1,000)',value=as.character(value/1000)) %>%
+	pivot_wider(names_from='country',values_from='value')
+
+# mean age at donation
+st.age.t=stats.age.t %>%
+	group_by(country,sex,var) %>%
+	filter(!is.na(age)) %>%
+	summarise(value=sum(n*age)/sum(n),.groups='drop') %>%
+	mutate(var='Mean age at donation',value=round(value,2)) %>%
+	pivot_wider(names_from='country',values_from='value')
+
+st.age0=stats.age %>%
+	group_by(country,sex,var) %>%
+	filter(!is.na(age)) %>%
+	summarise(value=sum(n*age)/sum(n),.groups='drop') %>%
+	mutate(var='Mean age at first donation',value=round(value,2)) %>%
+	pivot_wider(names_from='country',values_from='value')
+
+st.all=rbind(st.donor,st.donations,st.age.t) %>%
+	mutate(ord=row_number()) %>%
+	arrange(sex,ord) %>%
+	rowwise() %>%
+	mutate(sex=if (ord > 2) '' else sex) %>%
+	dplyr::select(-ord)
+colnames(st.all)[-(1:2)]=sapply(colnames(st.all)[-(1:2)],function(x) cn.names[[x]])
+colnames(st.all)[2]='Quantity'
+colnames(st.all)=firstUp(colnames(st.all))
+st.all
+
+
+html.table1.s=paste(capture.output(print(xtable(st.all,align=c('l','l',rep('r',ncol(st.all)-1))),type='html',include.rownames=FALSE)),collapse='\n')
+html.table1.s=gsub('&amp;','&',html.table1.s)
+caption='<b>Table 1S</b> Descriptive statistics of study sample'
+html.file.1s=sub('¤table¤',paste0(caption,'\n',html.table1.s),html.template)
+cat(html.file.1s,file=paste0(param$shared.dir,'table-1 survival.html'))

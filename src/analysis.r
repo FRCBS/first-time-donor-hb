@@ -79,6 +79,13 @@ lapply(rownames(vl.comb),function(x) {
 
 dev.off()
 
+# nb! using sqrt(t) implies steeper initial decline than in the standard exponential model
+t=0:500
+y=exp(-0.002*t)
+y2=exp(-0.002*sqrt(500)*sqrt(t))
+plot(y~t,type='l',col='blue3',lwd=3)
+lines(t,y2,lwd=3)
+
 res.curves=res.curves %>% arrange(country,ord,sex,time)
 dummy=by(res.curves,res.curves[,c('country','ord','sex')],function(df) {
 		wh=min(which(df$surv<0.99))
@@ -174,13 +181,32 @@ by(fitted.116,fitted.116$ord,function(x) {
 })
 # dev.off()
 
-pdf('results/survival-parameters.pdf')
-# plotParameters(ce)
-# list(Male='blue3',Female='red3')
-		par(mar=c(4.1,4.1,0.2,0.1)) # modifired measures with left and bottom margins for labels and some at top for y-axis labels
-		par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
+# Both sexes in the same plot
+pdf('results/survival-parameters.pdf',width=7,height=6)
+par(mar=c(4.1,4.1,0.2,0.1)) # modifired measures with left and bottom margins for labels and some at top for y-axis labels
+par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
 plotParameters2(ce,xvar='log_alpha',yvar='yf',group.by=c('country','sex'),col.var='country',pp.cols=colours,shade.var='ord')
 dev.off()
+
+lims = ce %>% 
+	group_by(var) %>%
+	summarise(min=min(Estimate),max=max(Estimate)) %>%
+	data.frame()
+rownames(lims)=lims$var
+lims$var=NULL
+lims
+
+source('src/analysis-functions.r')
+# Sexes in different plots
+by(ce,ce$sex,function(ce0) {
+bsAssign('ce0')
+	sex0=ce0$sex[1]
+	pdf(paste0('results/survival-parameters-',sex0,'.pdf'),width=7,height=6)
+	par(mar=c(4.1,4.1,0.2,0.1)) # modifired measures with left and bottom margins for labels and some at top for y-axis labels
+	par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
+	plotParameters2(ce0,xvar='log_alpha',yvar='yf',group.by=c('country','sex'),col.var='country',pp.cols=colours,shade.var='ord',ylim=t(lims['yf',]))
+	dev.off()
+})
 
 sapply(unique(res.models$country),plotSurvivalCurvesByCountry)
 

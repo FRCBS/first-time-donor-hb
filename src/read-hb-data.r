@@ -1,9 +1,6 @@
-# TODO must create 
-
 setwd('c:/hy-version/first-time-donor-hb')
 source('src/analysis-functions.r')
 
-## ----parameters,echo=FALSE----------------------------------------------------
 param=list()
 param$data.dir = 'C:/Users/super/OneDrive - University of Helsinki/veripalvelu/paper-2 hemoglobin/data/'
 param$shared.dir='C:/Users/super/OneDrive - University of Helsinki/veripalvelu/paper-2 hemoglobin/hb-paper-manuscripts/'
@@ -18,7 +15,6 @@ if (grepl('^VP',Sys.info()[4])) {
 param$png.resolution=1.4*150
 param$figure.format='pdf'
 
-## ----read-files,echo=FALSE----------------------------------------------------
 file.names = dir(path=param$data.dir,pattern="*hb.xlsx")
 file.names = file.names[!grepl('~',file.names)]
 file.names = file.names[!grepl('^old',file.names)]
@@ -102,9 +98,22 @@ hourly.grouped=hourly.statistics %>%
 margins[['hour']]=hourly.grouped
 
 # 2026-05-25
+
+dt.max.list=lapply(names(countries),function(x) {
+	countries[[x]]$param %>%
+		rowwise() %>%
+		filter(grepl('dt.max',name)) %>%
+		mutate(dt.value=as.Date(as.integer(value)),month=month(dt.value),day=day(dt.value)) %>%
+		mutate(full.year=if(month==12 && day >= 30) 1 else 0) %>%
+		# mutate(country=x,name=firstUp(sub('cutoff.','',name))) %>%
+		data.frame()
+})
+dt.maxs=do.call(rbind,dt.max.list)
+
 use.years=annual.hb %>%
+	left_join(dt.maxs,join_by(country)) %>%
 	group_by(country) %>%
-	summarise(year.min=min(year)+2,year.max=max(year)-1,.groups='drop')
+	summarise(year.min=min(year)+2,year.max=max(year)+coalesce(max(full.year),0)-1,.groups='drop')
 
 margins=lapply(margins,function(x) {
 		x %>%
@@ -125,7 +134,7 @@ cutoff.list=lapply(names(countries),function(x) {
 		data.frame()
 })
 cutoffs=do.call(rbind,cutoff.list)
-str(cutoffs)
+# str(cutoffs)
 
 plot.rects=FALSE
 rectifyOuter = function(df) {
@@ -244,8 +253,10 @@ plot.old.style=FALSE
 # pdf('results/margins.pdf')
 pdf('results/hb-margins-levels.pdf',width=12,height=6)
 file.pattern='results/hb-¤phase-¤margin-¤sex.pdf'
-file.pattern=''
+# file.pattern=''
 mar.res=list()
+add.legends=list()
+add.legends[['results/hb-levels-age-Female.pdf']]='topleft'
 # xlab closer to the axis
 # https://stackoverflow.com/questions/30265728/in-r-base-plot-move-axis-label-closer-to-axis
 for (nm in names(margins)) {
@@ -334,7 +345,7 @@ for (nm in names(margins)) {
 		xlim=as.numeric(c(min(y[,'level']),max(y[,'level'])))
 
 		ylim=c(min(y[,'Estimate']),max(y[,'Estimate']))
-		plot(NULL,xlim=xlim,ylim=ylim,ylab='hb',xlab=nm,main=main)
+		plot(NULL,xlim=xlim,ylim=ylim,ylab='hemoglobin (g/L)',xlab=nm,main=main)
 		by (y,y$country,function(x) {
 			x$level=as.integer(x$level)
 
@@ -369,6 +380,7 @@ for (nm in names(margins)) {
 		inner_join(conversions.df,join_by(country)) %>%
 		mutate(mean=mean*rate)
 
+	# Plotting levels
 	by(marnm,marnm$sex,function(y) {
 		sex0=y$sex[1]
 		y = y %>% 
@@ -386,6 +398,7 @@ for (nm in names(margins)) {
 			
 		local.plot=FALSE
 		main=paste(nm,sex0)
+		filename=NULL
 		if (!is.null(file.pattern) && file.pattern!='') {
 			# file.pattern='hb-¤phase-¤margin-¤sex.pdf'
 			param=list(phase='levels',margin=nm,sex=sex0)
@@ -401,7 +414,7 @@ for (nm in names(margins)) {
 		xlim=as.numeric(c(min(y[,'level']),max(y[,'level'])))
 		ylim=c(min(y[,'mean']),max(y[,'mean']))
 
-		plot(NULL,xlim=xlim,ylim=ylim,ylab='hb',xlab=nm,main=main)
+		plot(NULL,xlim=xlim,ylim=ylim,ylab='hemoglobin (g/L)',xlab=nm,main=main)
 		by (y,y$country,function(x) {
 			x$level=as.integer(x$level)
 
@@ -421,6 +434,15 @@ for (nm in names(margins)) {
 
 			lines(x$level,x$mean,col=col0,lwd=2)
 		})
+
+bsAssign('filename')
+		if (!is.null(filename) && filename %in% names(add.legends)) {
+			cn.ids=sort(unique(y$country))
+			# cn.ids=cn.ids[!grepl('corrected',cn.ids)]
+			legend(add.legends[[filename]],fill=unlist(sapply(cn.ids,FUN=colfun)),legend=sapply(cn.ids,FUN=function(cn) {
+				paste0(cn.names[[cn]])}))
+			
+		}
 
 		if (local.plot) 
 			dev.off()
