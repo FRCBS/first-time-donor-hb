@@ -291,39 +291,15 @@ for (nm in names(margins)) {
 		var.data[var.data$country==cn,convert.cols]= conversions[[cn]]*var.data[var.data$country==cn,convert.cols]
 	}
 
-	if (plot.old.style) {
-		# pp.cols=list(Male='blue3',Female='red3') # not needed anymore
-		xmin=min(var.data$level[var.data$level>=0])-1
-		plot(x=NULL,xlim=c(xmin,max(var.data$level)),ylim=c(min(var.data$lower),max(var.data$upper)),
-			main=paste(nm),xlab=nm,ylab='deviation from mean hb')
-		by(var.data,var.data[,c('country','sex')],function(x) {
-				sex0=x$sex[1]
-				country0=x$country[1]
-
-				# col0=pp.cols[[sex0]]
-				col0=colours[[country0]]
-
-				wh = which(x$level==-1)
-				if (length(wh) > 0) {
-					x0=min(x$level[-wh])-1+0.1*if(sex0=='Male') 0.2 else 0
-					arrows(x0,x$lower[wh],x0,x$Estimate[wh],length=0.05,angle=90,code=1,col=col0,lwd=1.5)
-					arrows(x0,x$Estimate[wh],x0,x$upper[wh],length=0.05,angle=90,code=2,col=col0,lwd=1.5)
-					points(x0,x$Estimate[wh],pch=pchs[[sex0]],col=col0)
-					x=x[-wh,]
-				}
-
-				lines(x$level,x$Estimate,col=col0,lwd=2,lty=if (sex0=='Female') 'solid' else 'dashed') # ltys[[sex0]])
-				# lines(x$level,x$upper,col=col0,lwd=1,lty='dashed')
-				# lines(x$level,x$lower,col=col0,lwd=1,lty='dashed')
-			})
-	}
-
 	# Copy from below - not optimal but should suffice
+	# plotting deviations
 	par(mfrow=c(1,2))
 	ylim=lim=c(min(var.data[,'Estimate']),max(var.data[,'Estimate']))
 	by(var.data,var.data$sex,function(y) {
 		if (nm == 'age') 
 			y = y %>% filter(level<=65)
+
+		y = y %>% filter(level!=-1)
 
 		sex0=y$sex[1]
 			
@@ -335,7 +311,7 @@ for (nm in names(margins)) {
 			filename=gsub('[](%,]','_',subFromList(file.pattern,param))
 			local.plot=TRUE
 
-			pdf(filename,width=7,heigh=5)
+			pdf(filename,width=7,height=5)
 			# par(mar=c(0.1,5.5,0.5,0.6)) # no space at the top; bottom,left,top,right bottom 2.2->0
 			par(mar=c(4.1,4.1,.1,0.1)) # no space at the top; bottom,left,top,right bottom 2.2->0
 			par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
@@ -345,13 +321,12 @@ for (nm in names(margins)) {
 		xlim=as.numeric(c(min(y[,'level']),max(y[,'level'])))
 
 		ylim=c(min(y[,'Estimate']),max(y[,'Estimate']))
-		plot(NULL,xlim=xlim,ylim=ylim,ylab='hemoglobin (g/L)',xlab=nm,main=main)
+		plot(NULL,xlim=xlim,ylim=ylim,ylab='deviation in hemoglobin (g/L)',xlab=nm,main=main)
 		by (y,y$country,function(x) {
 			x$level=as.integer(x$level)
 
 			# sex0=x$sex[1]
 			country0=x$country[1]
-
 			col0=colours[[country0]]
 
 			wh = which(x$level==-1)
@@ -395,6 +370,8 @@ for (nm in names(margins)) {
 
 		if (nm == 'age') 
 			y = y %>% filter(level<=65)
+
+		y = y %>% filter(level!=-1)
 			
 		local.plot=FALSE
 		main=paste(nm,sex0)
@@ -405,8 +382,11 @@ for (nm in names(margins)) {
 			filename=gsub('[](%,]','_',subFromList(file.pattern,param))
 			local.plot=TRUE
 
-			pdf(filename,width=7,heigh=5)
-			par(mar=c(4.1,4.1,.1,0.1)) # no space at the top; bottom,left,top,right bottom 2.2->0
+			pdf(filename,width=7,height=5-(63-51)/25.4)
+			# par(mar=c(4.1,4.1,.1,0.1)) # no space at the top; bottom,left,top,right bottom 2.2->0
+			par(mar=c(0.4,4.1,.1,0.1)) # no space at the top; bottom,left,top,right bottom 2.2->0
+# test=par(mar)
+# bsAssign('test')
 			par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
 			main=''
 		}
@@ -507,7 +487,7 @@ hb.cmp=inner_join(crtn.annual,hb.dummy,join_by(data.set,sex,country,year,)) %>%
 
 pdf('results/trends-corrected.pdf',width=12)
 par(mar=c(4,4,0.5,0.6)) # no space at the top; bottom,left,top,right bottom 2.2->0
-sms=plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=colours,colour.col='country',trends='table')
+sms=plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=colours,colour.col='country',trends='table',legend.position='left')
 dev.off()
 
 trends.table = sms %>% 
@@ -559,11 +539,6 @@ ctb3
 # all can be done at once
 # maybe ctb3 must 
 plot.et.data = function(etd,cwds=NULL,hadj=0,bold.first.row=TRUE) {
-bsAssign('etd')
-bsAssign('cwds')
-bsAssign('hadj')
-bsAssign('bold.first.row')
-
 	# etd=vls.df
 	ncols=length(table(etd$x))
 	if (is.null(cwds)) 

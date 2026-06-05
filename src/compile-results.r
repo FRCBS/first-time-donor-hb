@@ -47,7 +47,11 @@ html.table.ml='<table><tr>
 <td>(e) Netherlands</td> </tr><tr>
 </table>'
 
-captions$figure.h="<b>Figure H</b> Heatmaps for the countries"
+captions$figure.h="<b>Figure H</b> Heatmaps for the countries, panels&nbsp;(a) through&nbsp;(e). Red tones 
+indicate negative and blue tones positive corrections that are added to the mean hemoglobin values to 
+achieve corrected hemoglobin values. All units in g/L. The heatmaps show that overall, largest corrections 
+are due to age and changes in the age distribution over the years. The rectification of distributions produces 
+noticable but rather constant corrections (where applicable)."
 
 html.file=sub('¤table¤',paste(html.table.ml,if(include.captions) captions$figure.h else '',sep='\n'),html.template)
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-h heatmaps.html'))
@@ -59,7 +63,7 @@ html.table.t='<table><tr>
 <td><img width=1800 src="../results/trends-corrected.pdf"></td> </tr>
 </table>'
 
-captions$figure.t="<b>Figure T</b> Mean and corrected hemoglobin levels. <br>Fitted trend lines have been added where there is a statistically significant trend."
+captions$figure.t="<b>Figure T</b> Mean (solid lines) and corrected (dashed lines) hemoglobin levels. <br>Fitted trend lines have been added where there is a statistically significant trend."
 
 html.file=sub('¤table¤',paste(html.table.t,if(include.captions) captions$figure.t else '',sep='\n'),html.template)
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-t trends.html'))
@@ -108,24 +112,56 @@ html.table.s='<table><tr>
 <td><img width=500 src="../results/survival-joint-ord.group.full-Female-NA.png"></td>
 <td><img width=500 src="../results/survival-joint-ord.group.full-Male-NA.png"></td> </tr><tr>
 
+<td>(a)</td>
+<td>(b)</td> </tr><tr>
+
 <td><img width=500 src="../results/survival-joint-bloodgr-Female-NA.png"></td>
 <td><img width=500 src="../results/survival-joint-bloodgr-Male-NA.png"></td> </tr><tr>
+
+<td>(c)</td>
+<td>(d)</td> </tr><tr>
 
 <td><img width=500 src="../results/survival-joint-age.group.t-Female--15-20-.png"></td>
 <td><img width=500 src="../results/survival-joint-age.group.t-Male--15-20-.png"></td> </tr><tr>
 
-<td><img width=500 src="../results/survival-joint-hb.surplus-Female-bottom-10-.png"></td>
-<td><img width=500 src="../results/survival-joint-hb.surplus-Male-bottom-10-.png"></td> </tr><tr>
+<td>(e)</td>
+<td>(f)</td> </tr><tr>
 
 <td><img width=500 src="../results/survival-joint-hb.surplus-Female-bottom-10-.png"></td>
 <td><img width=500 src="../results/survival-joint-hb.surplus-Male-bottom-10-.png"></td> </tr><tr>
+
+<td>(g)</td>
+<td>(h)</td> </tr><tr>
 
 <td><img width=500 src="../results/survival-joint-sex-Female-NA.png"></td>
 <td><img width=500 src="../results/survival-sample-age.group.t-fi-female.png"></td> </tr>
 
+<td>(i)</td>
+<td>(j)</td> </tr><tr>
+
+<td><img width=500 src="../results/survival-cn0-Female.png"></td>
+<td><img width=500 src="../results/survival-cn0-Male.png"></td> </tr>
+
+<td>(k)</td>
+<td>(l)</td> </tr><tr>
+
+
 </table>'
 
-captions$figure.s="<b>Figure S</b> Relative retention by various various groups: (a) ..."
+# <td><img width=500 src="../results/survival-joint-hb.surplus-Female-bottom-10-.png"></td>
+# <td><img width=500 src="../results/survival-joint-hb.surplus-Male-bottom-10-.png"></td> </tr><tr>
+# <td>(i)</td>
+# <td>(j)</td> </tr><tr>
+
+captions$figure.s="<b>Figure S</b> Relative retention by various various groups: (a, b)&nbsp;Relative likelikelihood
+of next donation after the second etc. donation compared with after the first donation for females and males.
+(c,d)&nbsp;Relative likehood of retention for females and males, respectively, for O negative blood group compared with all other blood groups as reference,
+(e,f)&nbsp;Relative likehood of retention for females and males, respectively, in age of at most 20 years at donation, 
+compared with the reference age group of 41 to 45 years. 
+(g,h)&nbsp;Similarly for bottom 10% of hemoglobin surplus (excess to threshold) with the mid-50% group as reference.
+(i)&nbsp;Similarly for males, with females as reference group, 
+(j)&nbsp;example (Finnish females) of relative likelihoods of retention for age groups (at donation), with 41 to 45 as reference,
+(k,l)&nbsp;relative likelihood of retention for females and males, for different blood establishments (Australia as reference)"
 
 html.file=sub('¤table¤',paste(html.table.s,if(include.captions) captions$figure.s else '',sep='\n'),html.template)
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-s relative survival.html'))

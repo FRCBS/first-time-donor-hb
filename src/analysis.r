@@ -1,5 +1,62 @@
 source('src/analysis-functions.r')
 
+library(survival)
+
+# 2026-06-05 new content: estimate country-specific hr's from the curve data
+redat.list=lapply(names(countries),function(x) {
+	# x='fi'
+	countries[[x]]$curves %>%
+		dplyr::select(country,sex,ord,time,n.event,n.censor) %>%
+		# head(10) %>%
+		pivot_longer(cols=c('n.event','n.censor')) %>%
+		inner_join(data.frame(event=c(1,0),name=c('n.event','n.censor')),join_by(name)) %>%
+		dplyr::select(-name) %>%
+		rename(weight=value) %>%
+		filter(weight>0)
+})
+redat=do.call(rbind,redat.list)
+
+cn.models.list=by(redat,redat[,c('sex','ord')],function(x) {
+# bsAssign('x')
+	hb.var='country'
+	m=coxph(Surv(time,event)~country,data=x,weights=weight)
+	sm=summary(m)
+	df=data.frame(sm$coeff)
+	var='country'
+	level=sub(hb.var,'',rownames(df))
+	sex0=x$sex[1]
+	df=cbind(var=hb.var,level=level,ord.group=x$ord[1],df)
+	df$country=df$level
+	df$sex=sex0
+	# colnames(df)=c('var','level','ord.group','coef','exp.coef','se.coef','z','p.value')
+	df
+})
+cn.models=do.call(rbind,cn.models.list)
+
+#cn.models %>%
+#	filter(country=='fi')
+	
+source('src/analysis-functions.r')
+ylim=c(min(cn.models[['exp.coef.']]),max(cn.models[['exp.coef.']]))
+by(cn.models,cn.models$sex,function(cnm0) {
+	sex0=cnm0$sex[1]
+	pdf(paste0('results/survival-cn0-',sex0,'.pdf'),width=7,heigh=5)
+	par(mar=c(4.1,4.1,0.2,0.1)) # modifired measures with left and bottom margins for labels and some at top for y-axis labels
+	par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
+	plotByGroups(cnm0,xcol='ord.group',ycols='exp.coef.',group.cols=c('sex','country'),trends='',y.lim=ylim,
+		colours=colours,colour.col='country',xlab='number of donations',ylab='relative likelihood of next donation')
+	dev.off()
+})
+
+#plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c('Estimate','lower','upper'),
+#		ltys=list(cm='dashed',fi='solid'),colours=list(Male='blue3',Female='red3'),main='',colour.col='sex',
+#		trends='legend',legend.position='',y.lim=NULL,extras.fun=NULL,x.max=NA,xlab=NULL,ylab=NULL) {
+
+rbind(res.models,cn.models) %>% dim
+str(res.models)
+str(cn.models)
+
+###
 vars2=c('ord.group.full','bloodgr','age.group.t','hb.surplus','sex')
 vl.comb=left_join(data.frame(var=vars2),unique((res.models %>% mutate(level=coalesce(level,'-')))[,c('var','level')]),join_by(var))
 singles = vl.comb %>% 
@@ -70,7 +127,7 @@ lapply(rownames(vl.comb),function(x) {
 			
 			plotByGroups(y,group.cols=c(NA,'country'),xcol='ord',ycols=ycols,y.lim=ylim,
 				colours=colours,ltys=ltys,main=main,trends='',legend.position=legend.position,
-				extras.fun=hr.plot.extras.fun,x.max=x$x.max)
+				extras.fun=hr.plot.extras.fun,x.max=x$x.max,xlab='number of donations',ylab='relative likelihood of next donation')
 
 			if (local.plot)
 				dev.off()
