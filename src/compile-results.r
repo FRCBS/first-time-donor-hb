@@ -13,15 +13,21 @@ html.table.ml='<table><tr>
 <td><img width=500 src="../results/hb-margins-age-Female.png"></td>
 <td><img width=500 src="../results/hb-margins-age-Male.png"></td> </tr><tr>
 
+<td colspan="2">(a)</td>  </tr><tr>
+
 <td><img width=500 src="../results/hb-levels-month-Female.png"></td>
 <td><img width=500 src="../results/hb-levels-month-Male.png"></td> </tr><tr>
 <td><img width=500 src="../results/hb-margins-month-Female.png"></td>
 <td><img width=500 src="../results/hb-margins-month-Male.png"></td> </tr><tr>
 
+<td colspan="2">(b)</td>  </tr><tr>
+
 <td><img width=500 src="../results/hb-levels-hour-Female.png"></td>
 <td><img width=500 src="../results/hb-levels-hour-Male.png"></td> </tr><tr>
 <td><img width=500 src="../results/hb-margins-hour-Female.png"></td>
 <td><img width=500 src="../results/hb-margins-hour-Male.png"></td> </tr>
+
+<td colspan="2">(c)</td>  </tr><tr>
 
 </table>'
 
@@ -29,6 +35,7 @@ captions$figure.ml="<b>Figure ML</b> Levels and estimated deviations by age and 
 (females on left, males on right). See legend for colours in top-left panel."
 
 html.file=sub('¤table¤',paste(html.table.ml,if(include.captions) captions$figure.ml else '',sep='\n'),html.template)
+source('src/analysis-functions.r')
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-ml levels margins.html'))
 
 ### heatmaps
@@ -112,39 +119,38 @@ html.table.s='<table><tr>
 <td><img width=500 src="../results/survival-joint-ord.group.full-Female-NA.png"></td>
 <td><img width=500 src="../results/survival-joint-ord.group.full-Male-NA.png"></td> </tr><tr>
 
-<td>(a)</td>
-<td>(b)</td> </tr><tr>
+<td>(a)&nbsp;Relative to first donation, females</td>
+<td>(b)&nbsp;Relative to first donation, males</td> </tr><tr>
 
 <td><img width=500 src="../results/survival-joint-bloodgr-Female-NA.png"></td>
 <td><img width=500 src="../results/survival-joint-bloodgr-Male-NA.png"></td> </tr><tr>
 
-<td>(c)</td>
-<td>(d)</td> </tr><tr>
+<td>(c)&nbsp;O- donor relative to other, females</td>
+<td>(d)&nbsp;O- donor relative to other, males</td> </tr><tr>
 
 <td><img width=500 src="../results/survival-joint-age.group.t-Female--15-20-.png"></td>
 <td><img width=500 src="../results/survival-joint-age.group.t-Male--15-20-.png"></td> </tr><tr>
 
-<td>(e)</td>
-<td>(f)</td> </tr><tr>
+<td>(e)&nbsp;Donors up to 20 vs. 41 to 45 years of age, females</td>
+<td>(f)&nbsp;Donors up to 20 vs. 41 to 45 years of age, males</td> </tr><tr>
 
 <td><img width=500 src="../results/survival-joint-hb.surplus-Female-bottom-10-.png"></td>
 <td><img width=500 src="../results/survival-joint-hb.surplus-Male-bottom-10-.png"></td> </tr><tr>
 
-<td>(g)</td>
-<td>(h)</td> </tr><tr>
+<td>(g)&nbsp;Bottom decile of hemoglobin, females</td>
+<td>(h)&nbsp;Bottom decile of hemoglobin, males</td> </tr><tr>
 
 <td><img width=500 src="../results/survival-joint-sex-Female-NA.png"></td>
 <td><img width=500 src="../results/survival-sample-age.group.t-fi-female.png"></td> </tr>
 
-<td>(i)</td>
-<td>(j)</td> </tr><tr>
+<td>(i)Males with females as reference group</td>
+<td>(j)Relative to donors of 41 to 45 years of age</td> </tr><tr>
 
 <td><img width=500 src="../results/survival-cn0-Female.png"></td>
 <td><img width=500 src="../results/survival-cn0-Male.png"></td> </tr>
 
-<td>(k)</td>
-<td>(l)</td> </tr><tr>
-
+<td>(k)Relative to Australia, females</td>
+<td>(l)Relative to Australia, males</td> </tr><tr>
 
 </table>'
 
@@ -158,7 +164,7 @@ of next donation after the second etc. donation compared with after the first do
 (c,d)&nbsp;Relative likehood of retention for females and males, respectively, for O negative blood group compared with all other blood groups as reference,
 (e,f)&nbsp;Relative likehood of retention for females and males, respectively, in age of at most 20 years at donation, 
 compared with the reference age group of 41 to 45 years. 
-(g,h)&nbsp;Similarly for bottom 10% of hemoglobin surplus (excess to threshold) with the mid-50% group as reference.
+(g,h)&nbsp;Similarly for bottom decile of hemoglobin surplus (excess to threshold) with the mid-50% fractile as reference.
 (i)&nbsp;Similarly for males, with females as reference group, 
 (j)&nbsp;example (Finnish females) of relative likelihoods of retention for age groups (at donation), with 41 to 45 as reference,
 (k,l)&nbsp;relative likelihood of retention for females and males, for different blood establishments (Australia as reference)"
@@ -172,11 +178,17 @@ html.table.c='<table><tr>
 <td><img width=500 src="../results/survival-curves-1-Female.png"></td>
 <td><img width=500 src="../results/survival-curves-1-Male.png"></td> </tr><tr>
 
+<td colspan="2">(a)&nbsp;Retention after the first donation, females (left) and males</td>  </tr><tr>
+
 <td><img width=500 src="../results/survival-curves-16-Female.png"></td>
 <td><img width=500 src="../results/survival-curves-16-Male.png"></td> </tr><tr>
 
+<td colspan="2">(b)&nbsp;Retention after 16 or more donations</td>  </tr><tr>
+
 <td><img width=500 src="../results/survival-parameters-Female.png"></td>
 <td><img width=500 src="../results/survival-parameters-Male.png"></td> </tr>
+
+<td colspan="2">(c)Parameters estimated from the asymptotic regression model</td>  </tr><tr>
 
 </table>'
 

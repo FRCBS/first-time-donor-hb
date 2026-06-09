@@ -396,8 +396,16 @@ bsAssign('html.file')
 		tex=gsub('[<]table[>].tr.','\\\\begin{tabular}{cc}',tex)
 		tex=gsub('[<]/table[>]','\\\\end{tabular}\n\\\\end{center}\n',tex)
 		tex=gsub('[<]/tr[>][<]tr[>]','\\\\\\\\\n',tex)
+
+		# \multicolumn{2}{c|}{Fasting Value}
+		# tex0='<td colspan="2">(a)</td>  </tr><tr>'
+		tex=gsub('[<]td colspan="([0-9]+)"[>][\n ]*([^<]*)[<]/td[^>]*[>]','\\\\multicolumn{\\1}{c}{\\2}  \\\\\\\\',tex)
+
+
 		tex=gsub('[<]/td[>][\n ]*[<]td[^>]*[>]',' & ',tex)
 		# tex=gsub('[<]/td[>][\n ]*[^>]+td[^>]*[>]',' & ',tex)
+
+
 		tex=gsub('[<]/tr[>]','\\\\\\\\\n',tex)
 		tex=gsub('[<]b[>]([^<]+)[<]/b[>]','\\\\textbf{\\1}',tex)
 		tex=gsub('[<]/body[>].+','\n\\\\end{document}',tex)
@@ -424,7 +432,7 @@ bsAssign('html.file')
 			tex=gsub('9cm','16cm',tex)
 		}
 
-		tex.pre=paste0('\\documentclass[varwidth=',page.width,'cm,border=2mm]{standalone}\n\\usepackage[pdftex]{color,graphicx}\n\\begin{document} \\begin{center}')
+		tex.pre=paste0('\\documentclass[varwidth=',page.width,'cm,border=2mm]{standalone}\n\\usepackage[pdftex]{color,graphicx}\n\n\n\\begin{document} \\begin{center}')
 
 		wd=sub('^(.+[/\\]).+','\\1',file)
 		bare.file=sub(wd,'',file,fixed=TRUE)

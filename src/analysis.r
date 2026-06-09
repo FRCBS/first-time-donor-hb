@@ -45,6 +45,7 @@ by(cn.models,cn.models$sex,function(cnm0) {
 	par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
 	plotByGroups(cnm0,xcol='ord.group',ycols='exp.coef.',group.cols=c('sex','country'),trends='',y.lim=ylim,
 		colours=colours,colour.col='country',xlab='number of donations',ylab='relative likelihood of next donation')
+	abline(h=1,lty='dashed')
 	dev.off()
 })
 
@@ -52,7 +53,7 @@ by(cn.models,cn.models$sex,function(cnm0) {
 #		ltys=list(cm='dashed',fi='solid'),colours=list(Male='blue3',Female='red3'),main='',colour.col='sex',
 #		trends='legend',legend.position='',y.lim=NULL,extras.fun=NULL,x.max=NA,xlab=NULL,ylab=NULL) {
 
-rbind(res.models,cn.models) %>% dim
+# rbind(res.models,cn.models) %>% dim
 str(res.models)
 str(cn.models)
 
@@ -154,6 +155,7 @@ dummy=by(res.curves,res.curves[,c('country','ord','sex')],function(df) {
 		# This is promising based on description, but seems not to work after all
 		# m.ss=nls(surv~SSweibull(time,yf,y0,log_alpha,poweri),data=df)
 		m.ss=NULL
+		# SSasymp(input, Asym, R0, lrc)
 		try(m.ss<-nls(surv~SSasymp(sqrt.x,yf,y0,log_alpha),data=df))
 
 		if (is.null(m.ss)) {
@@ -172,25 +174,6 @@ dummy=by(res.curves,res.curves[,c('country','ord','sex')],function(df) {
 	})
 ce=do.call(rbind,lapply(dummy,function(x) x$parameters))
 fitted=do.call(rbind,lapply(dummy,function(x) x$fitted.data))
-
-pdf('results\\survival-joint-curves.pdf')
-by(fitted,fitted$ord,function(x) {
-	# plot here
-	plot(x=NULL,xlim=c(0,2*365),ylim=c(0,1),main=x$ord[1],ylab='survival',xlab='time')
-	by(x,x[,c('sex','country')],function(y) {
-		country0=y$country[1]
-		sex0=y$sex[1]
-		col=colours[[country0]]
-		# pch=pchs[[sex0]]
-
-		lines(fitted~time,data=y,col=col,lwd=2,lty='dotted')
-		lines(surv~time,data=y,col=col,lwd=2,lty=if (sex0=='Female') 'solid' else '8282')
-
-		# wh=seq(1,y$time[nrow(y],by=50)
-		# points(y$surv[wh],)
-	})
-})
-dev.off()
 
 pdf('results\\survival-joint-curves.pdf')
 by(fitted,fitted$ord,function(x) {
@@ -232,6 +215,7 @@ by(fitted.116,fitted.116$ord,function(x) {
 
 			lines(fitted~time,data=z,col=col,lwd=2,lty='dotted')
 			lines(surv~time,data=z,col=col,lwd=2) # ,lty=if (sex0=='Female') 'solid' else '8282')
+			abline(h=0,lty='dashed')
 		})
 		dev.off()
 	})

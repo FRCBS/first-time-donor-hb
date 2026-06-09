@@ -171,6 +171,8 @@ dev.off()
 # source('src/analysis-functions.r')
 pdf('results/rectify-distribution-sample.pdf',width=6,height=5)
 sample.data=annual.hb.dist %>% filter(country=='fi',sex=='Female',year==2013)
+# sample.data=annual.hb.dist %>% filter(country=='nl',sex=='Female',year==2013)
+
 plot.rects=TRUE
 rectifyOuter(sample.data)
 plot.rects=FALSE
@@ -257,8 +259,10 @@ file.pattern='results/hb-¤phase-¤margin-¤sex.pdf'
 mar.res=list()
 add.legends=list()
 add.legends[['results/hb-levels-age-Female.pdf']]='topleft'
+
 # xlab closer to the axis
 # https://stackoverflow.com/questions/30265728/in-r-base-plot-move-axis-label-closer-to-axis
+# margins as input ~ these correspond roughly to 
 for (nm in names(margins)) {
 	# Here, the comparison between monitored hb levels and annual means happens
 	df=inner_join(margins[[nm]],annual.hb,join_by(country,sex,year,data.set)) %>% 
@@ -272,6 +276,9 @@ for (nm in names(margins)) {
 			if (length(table(x[[nm]])) == 1) 
 				return(NULL) 
 
+			# The regression happens here: so it is based on
+			# margins -> df -> x
+			# The result goes to var.data
 			frml.char=paste0('hb.dev~',nm,'+0')
 			m=lm(formula(frml.char),weights=n,data=x)
 			sm=summary(m)
@@ -293,9 +300,10 @@ for (nm in names(margins)) {
 
 	# Copy from below - not optimal but should suffice
 	# plotting deviations
+	# Nothing is plotted here, either
 	par(mfrow=c(1,2))
 	ylim=lim=c(min(var.data[,'Estimate']),max(var.data[,'Estimate']))
-	by(var.data,var.data$sex,function(y) {
+	dev.null=by(var.data,var.data$sex,function(y) {
 		if (nm == 'age') 
 			y = y %>% filter(level<=65)
 
@@ -355,7 +363,7 @@ for (nm in names(margins)) {
 		inner_join(conversions.df,join_by(country)) %>%
 		mutate(mean=mean*rate)
 
-	# Plotting levels
+	# Plotting levels: nothing is computed here
 	by(marnm,marnm$sex,function(y) {
 		sex0=y$sex[1]
 		y = y %>% 
@@ -433,6 +441,8 @@ bsAssign('filename')
 }
 dev.off() # margins.pdf
 
+# 2026-06-06 In the large scale, above happens the estimation: margins -> crtn
+# margins + annual.hb -> hb.dev~level -> crtn (country,sex,var,level + estimates)
 crtn=do.call(rbind,mar.res)
 crtn$level=as.character(crtn$level)
 
@@ -498,7 +508,9 @@ trends.table = sms %>%
 	# rename(p.value=Pr...t.) %>%
 	dplyr::select(country,sex,corrected,Estimate,p.value) %>%
 	mutate(p.value=round(p.value,4)) %>%
-	arrange(desc(corrected))
+	arrange(desc(corrected)) %>%
+	mutate(country=cn.names[[country]])
+
 wh=which(trends.table$p.value<0.05)
 if (length(wh) > 0) {
 	trends.table$p.value[wh]=paste0('¤',trends.table$p.value[wh],'%')
