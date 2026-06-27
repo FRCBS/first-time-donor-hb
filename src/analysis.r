@@ -3,9 +3,9 @@ source('src/analysis-functions.r')
 library(survival)
 
 # 2026-06-05 new content: estimate country-specific hr's from the curve data
-redat.list=lapply(names(countries),function(x) {
+redat.list=lapply(names(countries.surv),function(x) {
 	# x='fi'
-	countries[[x]]$curves %>%
+	countries.surv[[x]]$curves %>%
 		dplyr::select(country,sex,ord,time,n.event,n.censor) %>%
 		# head(10) %>%
 		pivot_longer(cols=c('n.event','n.censor')) %>%

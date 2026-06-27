@@ -74,7 +74,6 @@ plotByGroups.obsolete = function(data,group.cols=c('sex','country'),xcol='level'
 
 countries = list()
 for (file in file.paths) {
-print(file)
 	identifier = sub('.+[/\\]([a-z]+)[^/\\]+$','\\1',file) # gsub('.*\\\\(..).*\\.xlsx$','\\1',file)
 	if (nchar(identifier) > 2) 
 		next
@@ -107,6 +106,8 @@ print(file)
 
 res.models=do.call(rbind,lapply(names(countries),function(x) countries[[x]]$models))
 res.curves=do.call(rbind,lapply(names(countries),function(x) countries[[x]]$curves))
+
+countries.surv=countries
 
 # nb! should check why the column name is wrong in that file
 # this should be corrected now, but leave as is

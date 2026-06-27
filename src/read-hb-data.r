@@ -99,7 +99,8 @@ margins[['hour']]=hourly.grouped
 
 # 2026-05-25
 
-dt.max.list=lapply(names(countries),function(x) {
+dt.max.list=lapply(names(countries.surv),function(x) {
+bsAssign('x')
 	countries[[x]]$param %>%
 		rowwise() %>%
 		filter(grepl('dt.max',name)) %>%
