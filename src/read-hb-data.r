@@ -101,7 +101,7 @@ margins[['hour']]=hourly.grouped
 
 dt.max.list=lapply(names(countries.surv),function(x) {
 bsAssign('x')
-	countries[[x]]$param %>%
+	countries.surv[[x]]$param %>%
 		rowwise() %>%
 		filter(grepl('dt.max',name)) %>%
 		mutate(dt.value=as.Date(as.integer(value)),month=month(dt.value),day=day(dt.value)) %>%
@@ -550,7 +550,9 @@ ctb3
 # i specifies the colour
 # the rows represent the individual cells
 # all can be done at once
-# maybe ctb3 must 
+# maybe ctb3 must ...
+# hadj is the vector of horizontal adjustments for the text function
+# cdws~column widths
 plot.et.data = function(etd,cwds=NULL,hadj=0,bold.first.row=TRUE) {
 	# etd=vls.df
 	ncols=length(table(etd$x))
@@ -584,6 +586,8 @@ plot.et.data = function(etd,cwds=NULL,hadj=0,bold.first.row=TRUE) {
 		etd$font[etd$y==1]=2
 
 	by(etd,etd[,c('hadj','font')],function(etd.by) {
+bsAssign('etd.by')
+		etd.by=etd.by %>% filter(!is.na(value),value!='NA')
 		ha=etd.by$hadj[1]
 		text((1-ha)*etd.by$x0+ha*etd.by$x1,etd.by$y,labels=etd.by$value,cex=0.75,font=etd.by$font[1]) # 1 
 	})
@@ -593,10 +597,10 @@ library(RColorBrewer)
 
 # ctb4=ctb3
 # ctb4$y=1:nrow(ctb3)
+# 2026-06-27 How the heatmap is formed: ctb3 contains the table as it should be printed
 inx=expand.grid(row=1:nrow(ctb3),col=1:ncol(ctb3))
 vls=lapply(1:nrow(inx),function(x) data.frame(y=inx[x,'row'],x=inx[x,'col'],value=as.character(ctb3[inx[x,'row'],inx[x,'col']])))
 vls.df=do.call(rbind,vls)
-vls.df[1:10,]
 vls.df$col=NA
 
 col.minus=colorRampPalette(colors=c('red','white'))(30)
@@ -626,7 +630,7 @@ country.y=unique(vls.df[,c('value','y')] %>% filter(value %in% cn.names))
 lbc=vls.df %>%
 	left_join(country.y,join_by(y),suffix=c('','.country'))
 
-source('src/plot.et.data-draft.r')
+# source('src/plot.et.data-draft.r')
 
 by(lbc,lbc$value.country,function(x) {
 bsAssign('x')
