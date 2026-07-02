@@ -8,6 +8,9 @@ source('src/read-hb-data.r')
 # source('src/analysis-functions.r') # this is sourced in various other files
 source('src/analysis.r') # survival part
 
+source('src/compile-results.r') # survival part
+
+
 # Things to do
 # Check the distributions
 # Maybe comment if they are normal or not; even compute skewness and kurtosis

@@ -188,7 +188,7 @@ plotParameters2 = function(ce,xvar='log_alpha',yvar='yf',col.var='sex',
 	if (is.null(ylim)) 
 		ylim=t(lims[yvar,])
 
-	plot(x=NULL,xlim=t(lims[xvar,]),ylim=ylim,xlab='exponent',ylab='asymptote')
+	plot(x=NULL,xlim=t(lims[xvar,]),ylim=ylim,xlab='logarithmic rate constant (lrc)',ylab='asymptotic retention (a)')
 	by(ce,ce[,group.by],function(x) {
 		xdata=x %>%
 			# filter(as.character(!!!syms(col.var))==gr,var==xvar) %>%
@@ -413,9 +413,13 @@ bsAssign('html.file')
 		tex=gsub('&nbsp;','\\\\ ',tex)
 		tex=gsub('&frac12;','$\\\\frac{1}{2}$',tex)
 		tex=gsub('&ndash;','--',tex)
+
+		# tex=gsub('\\{','\\{',tex)
+		# tex=gsub('\\}','\\}',tex)
+
 		tex=gsub('~','\\\\sim',tex)
 		tex=gsub('&middot;','\\\\cdot',tex)
-		tex=gsub('(log|exp)[(]','\\\\\\1(',tex)
+		tex=gsub('(log)[(]','\\\\\\1(',tex)
 		tex=gsub('src=.([^>]+).[>]','>\\\\includegraphics[width=9cm]{\\1}',tex)
 
 		# 1800 is used to code two-column graphics

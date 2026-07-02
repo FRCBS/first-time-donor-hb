@@ -163,10 +163,7 @@ dummy=by(res.curves,res.curves[,c('country','ord','sex')],function(df) {
 		}
 		sm=summary(m.ss)
 
-		# plot(surv~time,data=df,type='l',lwd=2,xlim=c(0,2*365),ylim=c(0,1),
-		#	main=paste(df$sex[1],df$ord[1]))
 		pred.ss=predict(m.ss,data.frame(sqrt.x=df$sqrt.x))
-		# lines(df$time,pred.ss,col='red2',lwd=2.5)
 
 		tv=qt(0.025,df=sm$df[2])
 		return(list(parameters=data.frame(country=df$country[1],sex=df$sex[1],ord=df$ord[1],var=rownames(sm$coeff),sm$coeff,lower=sm$coeff[,1]-tv*sm$coeff[,2],upper=sm$coeff[,1]+tv*sm$coeff[,2]),
@@ -184,6 +181,9 @@ by(fitted,fitted$ord,function(x) {
 		sex0=y$sex[1]
 		col=colours[[country0]]
 		# pch=pchs[[sex0]]
+
+		y$surv=1-y$surv
+		y$fitted=1-y$fitted
 
 		lines(fitted~time,data=y,col=col,lwd=2,lty='dotted')
 		lines(surv~time,data=y,col=col,lwd=2,lty=if (sex0=='Female') 'solid' else '8282')
@@ -206,15 +206,18 @@ by(fitted.116,fitted.116$ord,function(x) {
 		pdf(paste0('results/survival-curves-',ord0,'-',sex0,'.pdf'),width=7,height=5.5)
 		par(mar=c(4.1,4.1,0.2,0.1)) # modifired measures with left and bottom margins for labels and some at top for y-axis labels
 		par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
-		plot(x=NULL,xlim=c(0,2*365),ylim=c(0,1),main='',ylab='survival',xlab='time') # main=x$ord[1]
+		plot(x=NULL,xlim=c(0,2*365),ylim=c(0,1),main='',ylab='retention',xlab='time (days)') # main=x$ord[1]
 		by(y,y$country,function(z) {
 			country0=z$country[1]
 			sex0=z$sex[1]
 			col=colours[[country0]]
 			# pch=pchs[[sex0]]
 
+			z$surv=1-z$surv
+			z$fitted=1-z$fitted
+
 			lines(fitted~time,data=z,col=col,lwd=2,lty='dotted')
-			lines(surv~time,data=z,col=col,lwd=2) # ,lty=if (sex0=='Female') 'solid' else '8282')
+			lines(surv~time,data=z,col=col,lwd=2) 
 			abline(h=0,lty='dashed')
 		})
 		dev.off()

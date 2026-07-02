@@ -54,7 +54,7 @@ html.table.ml='<table><tr>
 <td>(e) Netherlands</td> </tr><tr>
 </table>'
 
-captions$figure.h="<b>Figure H</b> Heatmaps for the countries, panels&nbsp;(a) through&nbsp;(e). Red tones 
+captions$figure.h="<b>Figure H</b> Heatmaps for the blood establishments, panels&nbsp;(a) through&nbsp;(e). Red tones 
 indicate negative and blue tones positive corrections that are added to the mean hemoglobin values to 
 achieve corrected hemoglobin values. All units in g/L. The heatmaps show that overall, largest corrections 
 are due to age and changes in the age distribution over the years. The rectification of distributions produces 
@@ -62,6 +62,42 @@ noticable but rather constant corrections (where applicable)."
 
 html.file=sub('¤table¤',paste(html.table.ml,if(include.captions) captions$figure.h else '',sep='\n'),html.template)
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-h heatmaps.html'))
+
+# D-figures
+
+html.table.ml='<table><tr>
+<td><img width=1800 src="../results/dist-heatmap-age-Australia"></td> </tr><tr>
+<td>(a) Australia</td> </tr><tr>
+<td><img width=1800 src="../results/dist-heatmap-age-Finland"></td> </tr><tr>
+<td>(b) Finland</td> </tr><tr>
+<td><img width=1800 src="../results/dist-heatmap-age-France"></td> </tr><tr>
+<td>(c) France</td> </tr><tr>
+<td><img width=1800 src="../results/dist-heatmap-age-Navarre"></td> </tr><tr>
+<td>(d) Navarre</td> </tr><tr>
+<td><img width=1800 src="../results/dist-heatmap-age-Netherlands"></td> </tr>
+<td>(e) Netherlands</td> </tr><tr>
+</table>'
+
+captions$figure.d="<b>Figure D</b> Heatmaps of the distribution of age by sex and year for the blood establishments, panels&nbsp;(a) through&nbsp;(e). 
+Red tones is for females and blue tones for males. Darker tones imply high number of donations."
+
+html.file=sub('¤table¤',paste(html.table.ml,if(include.captions) captions$figure.d else '',sep='\n'),html.template)
+convertOutput(html.file,file=paste0(param$shared.dir,'figure-d heatmaps-by-age.html'))
+
+html.table.ml='<table><tr>
+<td><img width=1800 src="../results/dist-heatmap-age-Finland"></td> </tr><tr>
+<td>(a) Finland</td> </tr><tr>
+<td><img width=1800 src="../results/dist-heatmap-age-Navarre"></td> </tr><tr>
+<td>(b) Navarre</td> </tr><tr>
+<td><img width=1800 src="../results/dist-heatmap-age-Netherlands"></td> </tr>
+<td>(c) Netherlands</td> </tr><tr>
+</table>'
+
+captions$figure.d2="<b>Figure D</b> Heatmaps of the distribution of hour of donation by sex and year for the blood establishments, panels&nbsp;(a) through&nbsp;(e). 
+Red tones is for females and blue tones for males. Darker tones imply high number of donations."
+
+html.file=sub('¤table¤',paste(html.table.ml,if(include.captions) captions$figure.d2 else '',sep='\n'),html.template)
+convertOutput(html.file,file=paste0(param$shared.dir,'figure-d2 heatmaps-by-age.html'))
 
 #### trends
 
@@ -192,22 +228,24 @@ html.table.c='<table><tr>
 
 </table>'
 
+frml.latex='$S(t)=a+(R_0–a)\\cdot \\exp\\{–\\exp(lrc)\\cdot \\sqrt{t}\\}$'
+frml.html='S(t)=a+(R<sub>0</sub>–a)·exp{–exp(lrc)·sqrt(t)}'
 captions$figure.c="<b>Figure C</b> Survival as a function of time for (a)&nbsp;1 and 
 (b)&nbsp;16 previous donations. Data for females on the left and males on the right. Top row: retention after
 first donation. Second row: retention after 16 or more donations. Legend for colours in bottom row. While there are significant differences 
 between blood establishments in retention after first donation, the differences tend to vanish with 
 increasing number of donations. This phenomenon can also be seen from the parameter estimates at the bottom 
-row, where the trajectories converge towards the bottom-right corner for all blood establishments."
-
-html.file=sub('¤table¤',paste(html.table.c,if(include.captions) captions$figure.c else '',sep='\n'),html.template)
+row, where the trajectories converge towards the bottom-right corner for all blood establishments. 
+(c) Parameters estimated from the model ¤frml for each country, sex and number of previous donations."
+html.file=sub('¤table¤',paste(html.table.c,if(include.captions) sub('¤frml',frml.latex,captions$figure.c,fixed=TRUE) else '',sep='\n'),html.template,fixed=TRUE)
+cat(html.file)
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-c curves.html'))
+captions$figure.c=sub('¤frml',frml.html,captions$figure.c,fixed=TRUE)
 
 # table 1 (for survival)
-
-# nb! 
 getCountriesStats = function(var) {
-	stats.list=lapply(names(countries),function(x) {
-		countries[[x]][[var]] %>%
+	stats.list=lapply(names(countries.surv),function(x) {
+		countries.surv[[x]][[var]] %>%
 			# rowwise() %>%
 			# filter(grepl('cutoff',name)) %>%
 			mutate(country=x,var=var) %>%
@@ -224,8 +262,6 @@ getCountriesStats = function(var) {
 stats.age=getCountriesStats('stats.age')
 stats.age.t=getCountriesStats('stats.age.t')
 stats.ord=getCountriesStats('stats.ord')
-
-str(stats.age)
 
 # number of donors by sex
 st.donor= stats.ord %>%
