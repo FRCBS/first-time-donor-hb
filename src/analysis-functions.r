@@ -386,14 +386,17 @@ bsAssign('lt0')
 		dev.off()
 }
 
-convertOutput = function(html,file,page.width=20) {
+convertOutput = function(html,file,page.width=20,nr.of.columns=2) {
 	if (param$figure.format == 'png') {
 		cat(html,file)
 	} else {
 bsAssign('html.file')
 		html.0=html.file
+
+		column.spec=paste0(rep('c',nr.of.columns),collapse='')
+
 		tex=sub('.+[<]body[>]','',html.file)
-		tex=gsub('[<]table[>].tr.','\\\\begin{tabular}{cc}',tex)
+		tex=gsub('[<]table[>].tr.',paste0('\\\\begin{tabular}{',column.spec,'}'),tex)
 		tex=gsub('[<]/table[>]','\\\\end{tabular}\n\\\\end{center}\n',tex)
 		tex=gsub('[<]/tr[>][<]tr[>]','\\\\\\\\\n',tex)
 

@@ -35,7 +35,7 @@ captions$figure.ml="<b>Figure ML</b> Levels and estimated deviations by age and 
 (females on left, males on right). See legend for colours in top-left panel."
 
 html.file=sub('¤table¤',paste(html.table.ml,if(include.captions) captions$figure.ml else '',sep='\n'),html.template)
-source('src/analysis-functions.r')
+# source('src/analysis-functions.r')
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-ml levels margins.html'))
 
 ### heatmaps
@@ -85,11 +85,11 @@ html.file=sub('¤table¤',paste(html.table.ml,if(include.captions) captions$figu
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-d heatmaps-by-age.html'))
 
 html.table.ml='<table><tr>
-<td><img width=1800 src="../results/dist-heatmap-age-Finland"></td> </tr><tr>
+<td><img width=1800 src="../results/dist-heatmap-hour-Finland"></td> </tr><tr>
 <td>(a) Finland</td> </tr><tr>
-<td><img width=1800 src="../results/dist-heatmap-age-Navarre"></td> </tr><tr>
+<td><img width=1800 src="../results/dist-heatmap-hour-Navarre"></td> </tr><tr>
 <td>(b) Navarre</td> </tr><tr>
-<td><img width=1800 src="../results/dist-heatmap-age-Netherlands"></td> </tr>
+<td><img width=1800 src="../results/dist-heatmap-hour-Netherlands"></td> </tr>
 <td>(c) Netherlands</td> </tr><tr>
 </table>'
 
@@ -97,7 +97,7 @@ captions$figure.d2="<b>Figure D</b> Heatmaps of the distribution of hour of dona
 Red tones is for females and blue tones for males. Darker tones imply high number of donations."
 
 html.file=sub('¤table¤',paste(html.table.ml,if(include.captions) captions$figure.d2 else '',sep='\n'),html.template)
-convertOutput(html.file,file=paste0(param$shared.dir,'figure-d2 heatmaps-by-age.html'))
+convertOutput(html.file,file=paste0(param$shared.dir,'figure-d2 heatmaps-by-hour.html'))
 
 #### trends
 

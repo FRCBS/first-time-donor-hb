@@ -146,6 +146,7 @@ rectifyOuter = function(df) {
 	cutoff=as.numeric(cutoffs[cutoffs$name==sex0&cutoffs$country==country0,'value'])
 
 	hb.decimals=max(sapply(df$hb,decimalPlaces))
+	# print(hb.decimals)
 	rv=rectifyDistribution(data0=NULL,freq=df,cutoff=cutoff,hb.decimals=hb.decimals,plot=plot.rects)
 
 	return(data.frame(country=country0,sex=sex0,year=year0,mean0=rv$param$mean0,mean1=rv$param$mean))
@@ -178,6 +179,41 @@ plot.rects=TRUE
 rectifyOuter(sample.data)
 plot.rects=FALSE
 dev.off()
+
+	plot.rects=TRUE
+#### All the rect-plots in a single sheet
+lst=by(annual.hb.dist,annual.hb.dist[,c('country','year','sex')],function(x) {
+bsAssign('x')
+	sex0=x$sex[1]
+	country0=x$country[1]
+	year0=x$year[1]
+
+	# print(country0)
+	filename=paste0('results/rect/',country0,'-',sex0,'-',year0,'.pdf')
+	pdf(filename,width=6,height=5)
+	rectifyOuter(x)
+	# plot.rects=FALSE
+	dev.off()
+
+	return(data.frame(country=country0,sex=sex0,year=year0,file=paste0('<img width=500 src="',filename,'">')))
+	return(data.frame(country=country0,sex=sex0,year=year0,file=paste0('\\includegraphics[width=10cm]{',filename,'}')))
+})
+rect.df=do.call(rbind,lst)
+rwide=pivot_wider(rect.df,values_from='file',names_from='country')
+colnames(rwide)[3:ncol(rwide)]=sapply(colnames(rwide[3:ncol(rwide)]),FUN=function(cn) {paste0(cn.names[[cn]])})
+colnames(rwide)
+header=rwide[1,]
+header=colnames(rwide)
+rwide=rbind(header,rwide)
+table.rect=apply(rwide,1,function(x) paste0('<tr><td>',paste0(x,collapse='</td><td>'),'</td></tr>'))
+table.rect=paste0('<table>',paste(table.rect,collapse='\n'),'</table>')
+html.file=sub('¤table¤',table.rect,html.template)
+html.file=gsub('results/rect','../results/rect',html.file,fixed=TRUE)
+html.file=gsub('NA','',html.file,fixed=TRUE)
+convertOutput(html.file,file=paste0(param$shared.dir,'figure-rr rects.html'),nr.of.columns=7,page.width=100)
+# convertOutput(html.file,file=paste0(param$shared.dir,'figure-ml levels margins.html'))
+
+
 
 ####### rectifyDistributions ends
 
