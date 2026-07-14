@@ -41,7 +41,7 @@ convertOutput(html.file,file=paste0(param$shared.dir,'figure-ml levels margins.h
 ### heatmaps
 
 # age month hour / levels and margins
-html.table.ml='<table><tr>
+html.table.h='<table><tr>
 <td><img width=500 src="../results/heatmap-Australia"></td> </tr><tr>
 <td>(a) Australia</td> </tr><tr>
 <td><img width=500 src="../results/heatmap-Finland"></td> </tr><tr>
@@ -60,12 +60,12 @@ achieve corrected hemoglobin values. All units in g/L. The heatmaps show that ov
 are due to age and changes in the age distribution over the years. The rectification of distributions produces 
 noticable but rather constant corrections (where applicable)."
 
-html.file=sub('¤table¤',paste(html.table.ml,if(include.captions) captions$figure.h else '',sep='\n'),html.template)
+html.file=sub('¤table¤',paste(html.table.h,if(include.captions) captions$figure.h else '',sep='\n'),html.template)
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-h heatmaps.html'))
 
 # D-figures
 
-html.table.ml='<table><tr>
+html.table.d='<table><tr>
 <td><img width=1800 src="../results/dist-heatmap-age-Australia"></td> </tr><tr>
 <td>(a) Australia</td> </tr><tr>
 <td><img width=1800 src="../results/dist-heatmap-age-Finland"></td> </tr><tr>
@@ -81,7 +81,7 @@ html.table.ml='<table><tr>
 captions$figure.d="<b>Figure D</b> Heatmaps of the distribution of age by sex and year for the blood establishments, panels&nbsp;(a) through&nbsp;(e). 
 Red tones is for females and blue tones for males. Darker tones imply high number of donations."
 
-html.file=sub('¤table¤',paste(html.table.ml,if(include.captions) captions$figure.d else '',sep='\n'),html.template)
+html.file=sub('¤table¤',paste(html.table.d,if(include.captions) captions$figure.d else '',sep='\n'),html.template)
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-d heatmaps-by-age.html'))
 
 html.table.ml='<table><tr>
@@ -93,7 +93,7 @@ html.table.ml='<table><tr>
 <td>(c) Netherlands</td> </tr><tr>
 </table>'
 
-captions$figure.d2="<b>Figure D</b> Heatmaps of the distribution of hour of donation by sex and year for the blood establishments, panels&nbsp;(a) through&nbsp;(e). 
+captions$figure.d2="<b>Figure D2</b> Heatmaps of the distribution of hour of donation by sex and year for the blood establishments, panels&nbsp;(a) through&nbsp;(e). 
 Red tones is for females and blue tones for males. Darker tones imply high number of donations."
 
 html.file=sub('¤table¤',paste(html.table.ml,if(include.captions) captions$figure.d2 else '',sep='\n'),html.template)
@@ -131,7 +131,7 @@ convertOutput(html.file,file=paste0(param$shared.dir,'figure-r rectification.htm
 table1=annual.hb %>%
 	filter(data.set=='donation0') %>%
 	group_by(country,year) %>%
-	summarise(n=sum(n.donor)/1000,.groups='drop') %>%
+	summarise(n=sum(n2)/1000,.groups='drop') %>%
 	left_join(data.frame(use.years,hit=''),join_by(country,between(year,y$year.min,y$year.max))) %>%
 	mutate(n=paste0(n,hit),n=sub('(.+)NA','(\\1)',n)) %>%
 	dplyr::select(country,year,n) %>%

@@ -385,7 +385,7 @@ if (FALSE) {
 	df0
 }
 		# df=data.frame(sm$coeff)
-		tv=-qt(0.025,df=sm$df[2])
+		# tv=-qt(0.025,df=sm$df[2])
 		df=data.frame(country=x$country[1],sex=x$sex[1],var=nm,mean0) %>%
 			inner_join(sd.mean,join_by(level))
 		df$std.err=df$sd/sqrt(df$n2)
@@ -420,191 +420,71 @@ bsAssign('var.data')
 	par(mfrow=c(1,2))
 	ylim=lim=c(min(var.data[,'Estimate']),max(var.data[,'Estimate']))
 
-plotCommon=function(var.name,margins) {
-	dev.null=by(var.data,var.data$sex,function(y) {
-		y=y %>% filter(name==var.name)
+	plotCommon=function(var.name,margins) {
+		dev.null=by(var.data,var.data$sex,function(y) {
+			y=y %>% filter(name==var.name)
 
-		if (nm == 'age') 
-			y = y %>% filter(level<=65)
+			if (nm == 'age') 
+				y = y %>% filter(level<=65)
 
-		y = y %>% filter(level!=-1)
+			y = y %>% filter(level!=-1)
 
-		sex0=y$sex[1]
-			
-		local.plot=FALSE
-		main=paste(nm,sex0)
-		if (!is.null(file.pattern) && file.pattern!='') {
-			# file.pattern='hb-¤phase-¤margin-¤sex.pdf'
-			param=list(phase=if(var.name=='hb.dev') 'margins' else 'levels',margin=nm,sex=sex0)
-			filename=gsub('[](%,]','_',subFromList(file.pattern,param))
-			local.plot=TRUE
+			sex0=y$sex[1]
+				
+			local.plot=FALSE
+			main=paste(nm,sex0)
+			if (!is.null(file.pattern) && file.pattern!='') {
+				# file.pattern='hb-¤phase-¤margin-¤sex.pdf'
+				param=list(phase=if(var.name=='hb.dev') 'margins' else 'levels',margin=nm,sex=sex0)
+				filename=gsub('[](%,]','_',subFromList(file.pattern,param))
+				local.plot=TRUE
 
-			pdf(filename,width=7,height=if(var.name=='hb.dev') 5 else 5-(63-51)/25.4)
-			par(mar=margins) # no space at the top; bottom,left,top,right bottom 2.2->0
-			par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
-			main=''
-		}
-
-		xlim=as.numeric(c(min(y[,'level']),max(y[,'level'])))
-
-		ylim=c(min(y[,'Estimate']),max(y[,'Estimate']))
-		plot(NULL,xlim=xlim,ylim=ylim,ylab=if(var.name=='hb.dev') 'deviation in hemoglobin (g/L)' else 'hemoglobin (g/L)',xlab=nm,main=main)
-		by (y,y$country,function(x) {
-			x$level=as.integer(x$level)
-
-			# sex0=x$sex[1]
-			country0=x$country[1]
-			col0=colours[[country0]]
-
-			wh = which(x$level==-1)
-			if (length(wh) > 0) {
-				x0=0 # min(x$level[-wh])-1+0.1*if(sex0=='Male') 0.2 else 0
-				arrows(x0,x$lower[wh],x0,x$Estimate[wh],length=0.05,angle=90,code=1,col=col0,lwd=1.5)
-				arrows(x0,x$Estimate[wh],x0,x$upper[wh],length=0.05,angle=90,code=2,col=col0,lwd=1.5)
-				points(x0,x$Estimate[wh],pch=pchs[[sex0]],col=col0)
-				x=x[-wh,]
+				pdf(filename,width=7,height=if(var.name=='hb.dev') 5 else 5-(63-51)/25.4)
+				par(mar=margins) # no space at the top; bottom,left,top,right bottom 2.2->0
+				par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
+				main=''
 			}
 
-			# 2026-07-11 lower and upper already available here
-			lines(x$level,x$Estimate,col=col0,lwd=2) 
-			lines(x$level,x$lower,col=col0,lwd=1,lty='dotted')
-			lines(x$level,x$upper,col=col0,lwd=1,lty='dotted')
+			xlim=as.numeric(c(min(y[,'level']),max(y[,'level'])))
+
+			ylim=c(min(y[,'Estimate']),max(y[,'Estimate']))
+			plot(NULL,xlim=xlim,ylim=ylim,ylab=if(var.name=='hb.dev') 'deviation in hemoglobin (g/L)' else 'hemoglobin (g/L)',xlab=nm,main=main)
+			by (y,y$country,function(x) {
+				x$level=as.integer(x$level)
+
+				# sex0=x$sex[1]
+				country0=x$country[1]
+				col0=colours[[country0]]
+
+				wh = which(x$level==-1)
+				if (length(wh) > 0) {
+					x0=0 # min(x$level[-wh])-1+0.1*if(sex0=='Male') 0.2 else 0
+					arrows(x0,x$lower[wh],x0,x$Estimate[wh],length=0.05,angle=90,code=1,col=col0,lwd=1.5)
+					arrows(x0,x$Estimate[wh],x0,x$upper[wh],length=0.05,angle=90,code=2,col=col0,lwd=1.5)
+					points(x0,x$Estimate[wh],pch=pchs[[sex0]],col=col0)
+					x=x[-wh,]
+				}
+
+				# 2026-07-11 lower and upper already available here
+				lines(x$level,x$Estimate,col=col0,lwd=2) 
+				lines(x$level,x$lower,col=col0,lwd=1,lty='dotted')
+				lines(x$level,x$upper,col=col0,lwd=1,lty='dotted')
+			})
+
+			if (!is.null(filename) && filename %in% names(add.legends)) {
+				cn.ids=sort(unique(y$country))
+				legend(add.legends[[filename]],fill=unlist(sapply(cn.ids,FUN=colfun)),legend=sapply(cn.ids,FUN=function(cn) {
+					paste0(cn.names[[cn]])}))
+				
+			}
+
+			if (local.plot) 
+				dev.off()
 		})
-
-		if (!is.null(filename) && filename %in% names(add.legends)) {
-			cn.ids=sort(unique(y$country))
-			legend(add.legends[[filename]],fill=unlist(sapply(cn.ids,FUN=colfun)),legend=sapply(cn.ids,FUN=function(cn) {
-				paste0(cn.names[[cn]])}))
-			
-		}
-
-		if (local.plot) 
-			dev.off()
-	})
-}
+	} # plotCommon
 
 	plotCommon('hb.dev',margins=c(4.1,4.1,.1,0.1))
 	plotCommon('hb.mean',margins=c(0.4,4.1,.1,0.1))
-
-	next
-
-	# dev.off()
-
-	# pdf('results/hb-levels.pdf')
-	par(mfrow=c(1,2))
-	
-	marnm=margins[[nm]] %>%
-		filter(data.set=='donation0') %>%
-		mutate(level=as.integer(!!!syms(nm))) %>%
-		inner_join(conversions.df,join_by(country)) %>%
-		mutate(mean=mean*rate)
-
-	# Plotting levels: nothing is computed here
-	by(marnm,marnm$sex,function(y) {
-bsAssign('y')
-		sex0=y$sex[1]
-		y0=y
-
-		y = y0 %>% 
-			# filter(data.set=='donation0') %>%
-			# mutate(level=as.integer(!!!syms(nm))) %>%
-			group_by(country,level) %>%
-			summarise(mean=sum(n*mean)/sum(n),.groups='drop') %>%
-			# inner_join(conversions.df,join_by(country)) %>%
-			# mutate(mean=mean*rate) %>%
-			arrange(country,level) %>%
-			data.frame()
-
-
-		# inner_join(y0,y,join_by(country,level)) %>% 
-		#	data.frame() %>%
-		#	group_by(country,level) %>%
-		#	summarise(variance=)	
-
-		if (nm == 'age') {
-			y = y %>% filter(level<=65)
-			y0 = y0 %>% filter(level<=65)
-		}
-
-		y = y %>% filter(level!=-1)
-		y0 = y0 %>% filter(level!=-1)
-			
-		local.plot=FALSE
-		main=paste(nm,sex0)
-		filename=NULL
-		if (!is.null(file.pattern) && file.pattern!='') {
-			# file.pattern='hb-¤phase-¤margin-¤sex.pdf'
-			param=list(phase='levels',margin=nm,sex=sex0)
-			filename=gsub('[](%,]','_',subFromList(file.pattern,param))
-			local.plot=TRUE
-
-			pdf(filename,width=7,height=5-(63-51)/25.4)
-			par(mar=c(0.4,4.1,.1,0.1)) # no space at the top; bottom,left,top,right bottom 2.2->0
-# test=par(mar)
-# bsAssign('test')
-			par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
-			main=''
-		}
-
-		xlim=as.numeric(c(min(y[,'level']),max(y[,'level'])))
-		ylim=c(min(y[,'mean']),max(y[,'mean']))
-
-		plot(NULL,xlim=xlim,ylim=ylim,ylab='hemoglobin (g/L)',xlab=nm,main=main)
-		by (y0,y0$country,function(x) {
-bsAssign('x')
-			x$level=as.integer(x$level)
-			x[[nm]]=as.character(x[[nm]])
-
-			if (length(table(x[[nm]]))==1)
-				return(NULL)
-
-			# copied from above
-			frml.char=paste0('mean~',nm,'+0')
-			m=lm(formula(frml.char),weights=n,data=x)
-			sm=summary(m)
-	
-			df=data.frame(sm$coeff)
-			tv=-qt(0.025,df=sm$df[2])
-			df=data.frame(country=x$country[1],sex=x$sex[1],var=nm,level=as.integer(sub(nm,'',rownames(df))),df,
-				lower=df$Estimate-tv*df$Std..Error,upper=df$Estimate+tv*df$Std..Error) # %>% arrange(country,sex,level)
-			df=df %>% arrange(level)
-
-bsAssign('df')
-		# nb! This should be converted to the new style as well
-		# Predict and the computation based on tv seem to give the same results
-
-			# sex0=x$sex[1]
-			country0=x$country[1]
-			col0=colours[[country0]]
-
-			wh = which(x$level==-1)
-			if (length(wh) > 0) {
-				x0=0 # min(x$level[-wh])-1+0.1*if(sex0=='Male') 0.2 else 0
-				# arrows(x0,x$lower[wh],x0,x$Estimate[wh],length=0.05,angle=90,code=1,col=col0,lwd=1.5)
-				# arrows(x0,x$Estimate[wh],x0,x$upper[wh],length=0.05,angle=90,code=2,col=col0,lwd=1.5)
-				points(x0,x$mean[wh],pch=pchs[[sex0]],col=col0)
-				x=x[-wh,]
-			}
-
-			# lines(x$level,x$mean,col=col0,lwd=2)
-			lines(df$level,df$Estimate,col=col0,lwd=2)
-			lines(df$level,df$lower,col=col0,lwd=1,lty='dotted')
-			lines(df$level,df$upper,col=col0,lwd=1,lty='dotted')
-		})
-
-bsAssign('filename')
-		if (!is.null(filename) && filename %in% names(add.legends)) {
-			cn.ids=sort(unique(y$country))
-			# cn.ids=cn.ids[!grepl('corrected',cn.ids)]
-			legend(add.legends[[filename]],fill=unlist(sapply(cn.ids,FUN=colfun)),legend=sapply(cn.ids,FUN=function(cn) {
-				paste0(cn.names[[cn]])}))
-			
-		}
-
-		if (local.plot) 
-			dev.off()
-	})
-	# dev.off()
 
 	mar.res[[nm]]=var.data
 }
@@ -612,7 +492,7 @@ dev.off() # margins.pdf
 
 # 2026-06-06 In the large scale, above happens the estimation: margins -> crtn
 # margins + annual.hb -> hb.dev~level -> crtn (country,sex,var,level + estimates)
-crtn=do.call(rbind,mar.res)
+crtn=do.call(rbind,mar.res) %>% filter(name=='hb.dev')
 crtn$level=as.character(crtn$level)
 
 # the difference is computed as observed-expected
@@ -745,17 +625,12 @@ plot.et.data = function(etd,cwds=NULL,hadj=0,bold.first.row=TRUE) {
 		return()
 	}
 
-	# etd$x-0.5, etd$x-0.5+1
 	rect(etd$x0,etd$y-0.5,etd$x1,etd$y-0.5+1,col=col_vector[etd$col],border='white')
-	# etd$x, (etd$x0+etd$x1)/2
-	# text((etd$x0+etd$x1)/2,etd$y,labels=etd$value,cex=0.75)
-
 	etd$font=0
 	if (bold.first.row)
 		etd$font[etd$y==1]=2
 
 	by(etd,etd[,c('hadj','font')],function(etd.by) {
-bsAssign('etd.by')
 		etd.by=etd.by %>% filter(!is.na(value),value!='NA')
 		ha=etd.by$hadj[1]
 		text((1-ha)*etd.by$x0+ha*etd.by$x1,etd.by$y,labels=etd.by$value,cex=0.75,font=etd.by$font[1]) # 1 
@@ -764,8 +639,6 @@ bsAssign('etd.by')
 
 library(RColorBrewer)
 
-# ctb4=ctb3
-# ctb4$y=1:nrow(ctb3)
 # 2026-06-27 How the heatmap is formed: ctb3 contains the table as it should be printed
 inx=expand.grid(row=1:nrow(ctb3),col=1:ncol(ctb3))
 vls=lapply(1:nrow(inx),function(x) data.frame(y=inx[x,'row'],x=inx[x,'col'],value=as.character(ctb3[inx[x,'row'],inx[x,'col']])))
@@ -799,10 +672,7 @@ country.y=unique(vls.df[,c('value','y')] %>% filter(value %in% cn.names))
 lbc=vls.df %>%
 	left_join(country.y,join_by(y),suffix=c('','.country'))
 
-# source('src/plot.et.data-draft.r')
-
 by(lbc,lbc$value.country,function(x) {
-bsAssign('x')
 	if (nrow(x) == 1)
 		return(NULL)
 
@@ -823,8 +693,3 @@ bsAssign('x')
 	plot.et.data(x,col.widths.sg,hadj=0.5)
 	dev.off()
 })
-
-# pdata=pivot_longer(dfdona,cols=starts_with('X'),names_to='year',names_prefix='X',values_to='donations') %>%
-# pivot_longer(ctb3,cols=colnames(ctb3),names_to=
-
-# nb! Should produce the heatmap tables in R instead to make it automatic
