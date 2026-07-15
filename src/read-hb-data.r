@@ -1,9 +1,6 @@
-# TODO must create 
-
 setwd('c:/hy-version/first-time-donor-hb')
 source('src/analysis-functions.r')
 
-## ----parameters,echo=FALSE----------------------------------------------------
 param=list()
 param$data.dir = 'C:/Users/super/OneDrive - University of Helsinki/veripalvelu/paper-2 hemoglobin/data/'
 param$shared.dir='C:/Users/super/OneDrive - University of Helsinki/veripalvelu/paper-2 hemoglobin/hb-paper-manuscripts/'
@@ -18,7 +15,6 @@ if (grepl('^VP',Sys.info()[4])) {
 param$png.resolution=1.4*150
 param$figure.format='pdf'
 
-## ----read-files,echo=FALSE----------------------------------------------------
 file.names = dir(path=param$data.dir,pattern="*hb.xlsx")
 file.names = file.names[!grepl('~',file.names)]
 file.names = file.names[!grepl('^old',file.names)]
@@ -94,17 +90,30 @@ hour.groups=hourly.statistics %>%
 hourly.grouped=hourly.statistics %>%
 	inner_join(hour.groups,join_by(country,data.set,hour,sex)) %>%
 	group_by(country,data.set,year,sex,hour.group) %>%
-	summarise(mean=sum(n*mean)/sum(n),n=sum(n),nas=sum(nas),deferred=sum(deferred),.groups='drop') %>%
+	summarise(mean=sum(n*mean)/sum(n),sd=sqrt(sum(n^2*sd^2)/sum(n^2)),n=sum(n),nas=sum(nas),deferred=sum(deferred),.groups='drop') %>%
 	rename(hour=hour.group) %>%
-	dplyr::select(country,data.set,year,sex,hour,n,nas,deferred,mean)
+	dplyr::select(country,data.set,year,sex,hour,n,nas,deferred,mean,sd)
 
 # use the newly formed grouped hourly statistics instead of the original one
 margins[['hour']]=hourly.grouped
 
 # 2026-05-25
+
+dt.max.list=lapply(names(countries.surv),function(x) {
+	countries.surv[[x]]$param %>%
+		rowwise() %>%
+		filter(grepl('dt.max',name)) %>%
+		mutate(dt.value=as.Date(as.integer(value)),month=month(dt.value),day=day(dt.value)) %>%
+		mutate(full.year=if(month==12 && day >= 30) 1 else 0) %>%
+		# mutate(country=x,name=firstUp(sub('cutoff.','',name))) %>%
+		data.frame()
+})
+dt.maxs=do.call(rbind,dt.max.list)
+
 use.years=annual.hb %>%
+	left_join(dt.maxs,join_by(country)) %>%
 	group_by(country) %>%
-	summarise(year.min=min(year)+2,year.max=max(year)-1,.groups='drop')
+	summarise(year.min=min(year)+2,year.max=max(year)+coalesce(max(full.year),0)-1,.groups='drop')
 
 margins=lapply(margins,function(x) {
 		x %>%
@@ -125,7 +134,7 @@ cutoff.list=lapply(names(countries),function(x) {
 		data.frame()
 })
 cutoffs=do.call(rbind,cutoff.list)
-str(cutoffs)
+# str(cutoffs)
 
 plot.rects=FALSE
 rectifyOuter = function(df) {
@@ -136,6 +145,7 @@ rectifyOuter = function(df) {
 	cutoff=as.numeric(cutoffs[cutoffs$name==sex0&cutoffs$country==country0,'value'])
 
 	hb.decimals=max(sapply(df$hb,decimalPlaces))
+	# print(hb.decimals)
 	rv=rectifyDistribution(data0=NULL,freq=df,cutoff=cutoff,hb.decimals=hb.decimals,plot=plot.rects)
 
 	return(data.frame(country=country0,sex=sex0,year=year0,mean0=rv$param$mean0,mean1=rv$param$mean))
@@ -162,17 +172,92 @@ dev.off()
 # source('src/analysis-functions.r')
 pdf('results/rectify-distribution-sample.pdf',width=6,height=5)
 sample.data=annual.hb.dist %>% filter(country=='fi',sex=='Female',year==2013)
+# sample.data=annual.hb.dist %>% filter(country=='nl',sex=='Female',year==2013)
+
 plot.rects=TRUE
 rectifyOuter(sample.data)
 plot.rects=FALSE
 dev.off()
 
+plot.rects=TRUE
+#### All the rect-plots in a single sheet
+lst=by(annual.hb.dist,annual.hb.dist[,c('country','year','sex')],function(x) {
+	sex0=x$sex[1]
+	country0=x$country[1]
+	year0=x$year[1]
+
+	# print(country0)
+	filename=paste0('results/rect/',country0,'-',sex0,'-',year0,'.pdf')
+	pdf(filename,width=6,height=5)
+	rectifyOuter(x)
+	# plot.rects=FALSE
+	dev.off()
+
+	return(data.frame(country=country0,sex=sex0,year=year0,file=paste0('<img width=500 src="',filename,'">')))
+	return(data.frame(country=country0,sex=sex0,year=year0,file=paste0('\\includegraphics[width=10cm]{',filename,'}')))
+})
+rect.df=do.call(rbind,lst)
+rwide=pivot_wider(rect.df,values_from='file',names_from='country')
+colnames(rwide)[3:ncol(rwide)]=sapply(colnames(rwide[3:ncol(rwide)]),FUN=function(cn) {paste0(cn.names[[cn]])})
+colnames(rwide)
+header=rwide[1,]
+header=colnames(rwide)
+rwide=rbind(header,rwide)
+table.rect=apply(rwide,1,function(x) paste0('<tr><td>',paste0(x,collapse='</td><td>'),'</td></tr>'))
+table.rect=paste0('<table>',paste(table.rect,collapse='\n'),'</table>')
+html.file=sub('¤table¤',table.rect,html.template)
+html.file=gsub('results/rect','../results/rect',html.file,fixed=TRUE)
+html.file=gsub('NA','',html.file,fixed=TRUE)
+convertOutput(html.file,file=paste0(param$shared.dir,'figure-rr rects.html'),nr.of.columns=7,page.width=100)
+# convertOutput(html.file,file=paste0(param$shared.dir,'figure-ml levels margins.html'))
+
 ####### rectifyDistributions ends
 
+# redefinition of annual.hb (old)
 annual.hb = annual.hb.dist %>%
 	group_by(data.set,sex,country,year) %>%
 	summarise(n.donor=sum(n),hb=sum(hb*n)/sum(n),.groups='drop') # %>%
 	data.frame()
+
+lst=by(annual.hb.dist,annual.hb.dist[,c('country','sex','data.set')],function(x) {
+bsAssign('x')
+	x$year=as.character(x$year)
+
+	x=x %>% inner_join(conversions.df,join_by(country)) %>%
+		mutate(hb=hb*rate)
+
+	m=lm(hb~year+0,data=x,weights=n)
+	sm=summary(m)
+
+	mean0 = x %>%
+		group_by(data.set,year) %>%
+		summarise(mean=sum(n*hb)/sum(n),.groups='drop')
+	# sd0=sqrt(sum((mean0-x$hb)^2))
+
+	sd.mean = x %>%
+		inner_join(mean0,join_by(data.set,year)) %>%
+		group_by(data.set,year) %>%
+		summarise(sd=sqrt(sum(n*(hb-mean)^2)/sum(n)),n2=sum(n),.groups='drop') %>%
+		mutate(sd.mean=sd/sqrt(n2)) %>%
+		mutate(year=as.integer(year))
+
+	df=data.frame(sm$coeff)
+	df$year=as.integer(sub('year','',rownames(df)))
+
+	df = df %>% inner_join(sd.mean,join_by(year))
+
+	tv=-qt(0.025,df=sm$df[2])
+	qv=-qnorm(0.025)
+
+	df=data.frame(country=x$country[1],sex=x$sex[1],data.set=x$data.set[1],var=nm,df,
+	 	lower=df$Estimate-qv*df$sd.mean,upper=df$Estimate+tv*df$sd.mean)
+
+	# df=data.frame(country=x$country[1],sex=x$sex[1],data.set=x$data.set[1],var=nm,df,
+	# 	lower=df$Estimate-tv*df$Std..Error,upper=df$Estimate+tv*df$Std..Error)
+	colnames(df)=sub('Estimate','hb',colnames(df))
+	return(df)
+})
+annual.hb=do.call(rbind,lst)
 
 # These are the total number of donations by country, sex and dataset (for each margin separately)
 totals=lapply(names(margins),FUN=function(nm) {
@@ -244,194 +329,170 @@ plot.old.style=FALSE
 # pdf('results/margins.pdf')
 pdf('results/hb-margins-levels.pdf',width=12,height=6)
 file.pattern='results/hb-¤phase-¤margin-¤sex.pdf'
-file.pattern=''
+# file.pattern=''
 mar.res=list()
+add.legends=list()
+add.legends[['results/hb-levels-age-Female.pdf']]='topleft'
+
 # xlab closer to the axis
 # https://stackoverflow.com/questions/30265728/in-r-base-plot-move-axis-label-closer-to-axis
+# margins as input ~ these correspond roughly to 
 for (nm in names(margins)) {
 	# Here, the comparison between monitored hb levels and annual means happens
-	df=inner_join(margins[[nm]],annual.hb,join_by(country,sex,year,data.set)) %>% 
+	df=margins[[nm]] %>%
+		inner_join(conversions.df,join_by(country)) %>%
+		mutate(mean=mean*rate,sd=sd*rate) %>% # mutate(diff=mean1-mean0,diff=diff*rate)
+		inner_join(annual.hb,join_by(country,sex,year,data.set)) %>% 
 		filter(data.set=='donation0') %>% 
 		mutate(hb.dev=mean-hb)
 
 	df[[nm]]=as.character(df[[nm]])
 
 	rlist=by(df,df[,c('sex','country')],function(x) {
-			# 2026-05-24 Handle the case that hourly data is missing
-			if (length(table(x[[nm]])) == 1) 
-				return(NULL) 
+		# 2026-05-24 Handle the case that hourly data is missing
+bsAssign('x')
+# error(110)
+		colnames(x)=sub(nm,'level',colnames(x))
 
-			frml.char=paste0('hb.dev~',nm,'+0')
-			m=lm(formula(frml.char),weights=n,data=x)
-			sm=summary(m)
+		if (length(table(x[[nm]])) == 1) 
+			return(NULL) 
 
-			df=data.frame(sm$coeff)
-			tv=-qt(0.025,df=sm$df[2])
-			df=data.frame(country=x$country[1],sex=x$sex[1],var=nm,level=as.integer(sub(nm,'',rownames(df))),df,
-				lower=df$Estimate-tv*df$Std..Error,upper=df$Estimate+tv*df$Std..Error) %>%
-				arrange(country,sex,level)
-			return(df)
-		})
+		# The regression happens here: so it is based on
+		# margins -> df -> x
+		# The result goes to var.data
+		# frml.char=paste0('hb.dev~',nm,'+0')
+		# m=lm(formula(frml.char),weights=n,data=x)
+		# sm=summary(m)
+
+		mean0=x %>%
+			group_by(level) %>%
+			summarise(hb.mean=sum(n*mean)/sum(n),hb.dev=sum(n*hb.dev)/sum(n),.groups='drop') %>%
+			dplyr::select(hb.mean,hb.dev,level)
+
+		sd.mean=x %>%
+			group_by(level) %>%
+			summarise(sd=sqrt(sum(n^2*sd.x^2)/sum(n^2)),n2=sum(n))
+		colnames(sd.mean)=sub(nm,'level',colnames(sd.mean))
+
+		# nb! This should be converted to the new style as well
+		# Predict and the computation based on tv seem to give the same results
+if (FALSE) {
+	m=lm(mean~age+0,weights=n,data=x)
+	sm=summary(m)
+	new.data=unique(x$age)
+	df0=data.frame(predict(m,data.frame(age=new.data),interval='confidence'))
+	df0$age=new.data
+	df0
+}
+		# df=data.frame(sm$coeff)
+		# tv=-qt(0.025,df=sm$df[2])
+		df=data.frame(country=x$country[1],sex=x$sex[1],var=nm,mean0) %>%
+			inner_join(sd.mean,join_by(level))
+		df$std.err=df$sd/sqrt(df$n2)
+		df$level=as.integer(df$level)
+		df=df %>% arrange(level)
+		df = df %>% pivot_longer(cols=c('hb.mean','hb.dev'))
+		qv=-qnorm(0.025)
+		df = df %>% rename(est=value)
+		df$lower=df$est-qv*df$std.err
+		df$upper=df$est+qv*df$std.err
+		df = df %>% rename(Estimate=est)
+
+		# df=data.frame(country=x$country[1],sex=x$sex[1],var=nm,level=as.integer(sub(nm,'',rownames(df))),df,
+		#	lower=df$Estimate-tv*df$Std..Error,upper=df$Estimate+tv*df$Std..Error) %>%
+		#	arrange(country,sex,level)
+		return(df)
+	})
 	var.data=do.call(rbind,rlist)
+bsAssign('var.data')
 
 	# 2026-05-27 conversions done here as well
 	for (cn in names(conversions)) {
+		break # nb! not done here anymore
+
 		convert.cols=c('Estimate','Std..Error','lower','upper')
 		var.data[var.data$country==cn,convert.cols]= conversions[[cn]]*var.data[var.data$country==cn,convert.cols]
 	}
 
-	if (plot.old.style) {
-		# pp.cols=list(Male='blue3',Female='red3') # not needed anymore
-		xmin=min(var.data$level[var.data$level>=0])-1
-		plot(x=NULL,xlim=c(xmin,max(var.data$level)),ylim=c(min(var.data$lower),max(var.data$upper)),
-			main=paste(nm),xlab=nm,ylab='deviation from mean hb')
-		by(var.data,var.data[,c('country','sex')],function(x) {
-				sex0=x$sex[1]
-				country0=x$country[1]
+	# Copy from below - not optimal but should suffice
+	# plotting deviations
+	# Nothing is plotted here, either
+	par(mfrow=c(1,2))
+	ylim=lim=c(min(var.data[,'Estimate']),max(var.data[,'Estimate']))
 
-				# col0=pp.cols[[sex0]]
+	plotCommon=function(var.name,margins) {
+		dev.null=by(var.data,var.data$sex,function(y) {
+			y=y %>% filter(name==var.name)
+
+			if (nm == 'age') 
+				y = y %>% filter(level<=65)
+
+			y = y %>% filter(level!=-1)
+
+			sex0=y$sex[1]
+				
+			local.plot=FALSE
+			main=paste(nm,sex0)
+			if (!is.null(file.pattern) && file.pattern!='') {
+				# file.pattern='hb-¤phase-¤margin-¤sex.pdf'
+				param=list(phase=if(var.name=='hb.dev') 'margins' else 'levels',margin=nm,sex=sex0)
+				filename=gsub('[](%,]','_',subFromList(file.pattern,param))
+				local.plot=TRUE
+
+				pdf(filename,width=7,height=if(var.name=='hb.dev') 5 else 5-(63-51)/25.4)
+				par(mar=margins) # no space at the top; bottom,left,top,right bottom 2.2->0
+				par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
+				main=''
+			}
+
+			xlim=as.numeric(c(min(y[,'level']),max(y[,'level'])))
+
+			ylim=c(min(y[,'Estimate']),max(y[,'Estimate']))
+			plot(NULL,xlim=xlim,ylim=ylim,ylab=if(var.name=='hb.dev') 'deviation in hemoglobin (g/L)' else 'hemoglobin (g/L)',xlab=nm,main=main)
+			by (y,y$country,function(x) {
+				x$level=as.integer(x$level)
+
+				# sex0=x$sex[1]
+				country0=x$country[1]
 				col0=colours[[country0]]
 
 				wh = which(x$level==-1)
 				if (length(wh) > 0) {
-					x0=min(x$level[-wh])-1+0.1*if(sex0=='Male') 0.2 else 0
+					x0=0 # min(x$level[-wh])-1+0.1*if(sex0=='Male') 0.2 else 0
 					arrows(x0,x$lower[wh],x0,x$Estimate[wh],length=0.05,angle=90,code=1,col=col0,lwd=1.5)
 					arrows(x0,x$Estimate[wh],x0,x$upper[wh],length=0.05,angle=90,code=2,col=col0,lwd=1.5)
 					points(x0,x$Estimate[wh],pch=pchs[[sex0]],col=col0)
 					x=x[-wh,]
 				}
 
-				lines(x$level,x$Estimate,col=col0,lwd=2,lty=if (sex0=='Female') 'solid' else 'dashed') # ltys[[sex0]])
-				# lines(x$level,x$upper,col=col0,lwd=1,lty='dashed')
-				# lines(x$level,x$lower,col=col0,lwd=1,lty='dashed')
+				# 2026-07-11 lower and upper already available here
+				lines(x$level,x$Estimate,col=col0,lwd=2) 
+				lines(x$level,x$lower,col=col0,lwd=1,lty='dotted')
+				lines(x$level,x$upper,col=col0,lwd=1,lty='dotted')
 			})
-	}
 
-	# Copy from below - not optimal but should suffice
-	par(mfrow=c(1,2))
-	ylim=lim=c(min(var.data[,'Estimate']),max(var.data[,'Estimate']))
-	by(var.data,var.data$sex,function(y) {
-		if (nm == 'age') 
-			y = y %>% filter(level<=65)
-
-		sex0=y$sex[1]
-			
-		local.plot=FALSE
-		main=paste(nm,sex0)
-		if (!is.null(file.pattern) && file.pattern!='') {
-			# file.pattern='hb-¤phase-¤margin-¤sex.pdf'
-			param=list(phase='margins',margin=nm,sex=sex0)
-			filename=gsub('[](%,]','_',subFromList(file.pattern,param))
-			local.plot=TRUE
-
-			pdf(filename,width=7,heigh=5)
-			# par(mar=c(0.1,5.5,0.5,0.6)) # no space at the top; bottom,left,top,right bottom 2.2->0
-			par(mar=c(4.1,4.1,.1,0.1)) # no space at the top; bottom,left,top,right bottom 2.2->0
-			par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
-			main=''
-		}
-
-		xlim=as.numeric(c(min(y[,'level']),max(y[,'level'])))
-
-		ylim=c(min(y[,'Estimate']),max(y[,'Estimate']))
-		plot(NULL,xlim=xlim,ylim=ylim,ylab='hb',xlab=nm,main=main)
-		by (y,y$country,function(x) {
-			x$level=as.integer(x$level)
-
-			# sex0=x$sex[1]
-			country0=x$country[1]
-
-			col0=colours[[country0]]
-
-			wh = which(x$level==-1)
-			if (length(wh) > 0) {
-				x0=0 # min(x$level[-wh])-1+0.1*if(sex0=='Male') 0.2 else 0
-				arrows(x0,x$lower[wh],x0,x$Estimate[wh],length=0.05,angle=90,code=1,col=col0,lwd=1.5)
-				arrows(x0,x$Estimate[wh],x0,x$upper[wh],length=0.05,angle=90,code=2,col=col0,lwd=1.5)
-				points(x0,x$Estimate[wh],pch=pchs[[sex0]],col=col0)
-				x=x[-wh,]
+			if (!is.null(filename) && filename %in% names(add.legends)) {
+				cn.ids=sort(unique(y$country))
+				legend(add.legends[[filename]],fill=unlist(sapply(cn.ids,FUN=colfun)),legend=sapply(cn.ids,FUN=function(cn) {
+					paste0(cn.names[[cn]])}))
+				
 			}
 
-			lines(x$level,x$Estimate,col=col0,lwd=2)
+			if (local.plot) 
+				dev.off()
 		})
+	} # plotCommon
 
-		if (local.plot) 
-			dev.off()
-	})
-	# dev.off()
-
-	# pdf('results/hb-levels.pdf')
-	par(mfrow=c(1,2))
-	
-	marnm=margins[[nm]] %>%
-		filter(data.set=='donation0') %>%
-		mutate(level=as.integer(!!!syms(nm))) %>%
-		inner_join(conversions.df,join_by(country)) %>%
-		mutate(mean=mean*rate)
-
-	by(marnm,marnm$sex,function(y) {
-		sex0=y$sex[1]
-		y = y %>% 
-			# filter(data.set=='donation0') %>%
-			# mutate(level=as.integer(!!!syms(nm))) %>%
-			group_by(country,level) %>%
-			summarise(mean=sum(n*mean)/sum(n),.groups='drop') %>%
-			# inner_join(conversions.df,join_by(country)) %>%
-			# mutate(mean=mean*rate) %>%
-			arrange(country,level) %>%
-			data.frame()
-
-		if (nm == 'age') 
-			y = y %>% filter(level<=65)
-			
-		local.plot=FALSE
-		main=paste(nm,sex0)
-		if (!is.null(file.pattern) && file.pattern!='') {
-			# file.pattern='hb-¤phase-¤margin-¤sex.pdf'
-			param=list(phase='levels',margin=nm,sex=sex0)
-			filename=gsub('[](%,]','_',subFromList(file.pattern,param))
-			local.plot=TRUE
-
-			pdf(filename,width=7,heigh=5)
-			par(mar=c(4.1,4.1,.1,0.1)) # no space at the top; bottom,left,top,right bottom 2.2->0
-			par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
-			main=''
-		}
-
-		xlim=as.numeric(c(min(y[,'level']),max(y[,'level'])))
-		ylim=c(min(y[,'mean']),max(y[,'mean']))
-
-		plot(NULL,xlim=xlim,ylim=ylim,ylab='hb',xlab=nm,main=main)
-		by (y,y$country,function(x) {
-			x$level=as.integer(x$level)
-
-			# sex0=x$sex[1]
-			country0=x$country[1]
-
-			col0=colours[[country0]]
-
-			wh = which(x$level==-1)
-			if (length(wh) > 0) {
-				x0=0 # min(x$level[-wh])-1+0.1*if(sex0=='Male') 0.2 else 0
-				# arrows(x0,x$lower[wh],x0,x$Estimate[wh],length=0.05,angle=90,code=1,col=col0,lwd=1.5)
-				# arrows(x0,x$Estimate[wh],x0,x$upper[wh],length=0.05,angle=90,code=2,col=col0,lwd=1.5)
-				points(x0,x$mean[wh],pch=pchs[[sex0]],col=col0)
-				x=x[-wh,]
-			}
-
-			lines(x$level,x$mean,col=col0,lwd=2)
-		})
-
-		if (local.plot) 
-			dev.off()
-	})
-	# dev.off()
+	plotCommon('hb.dev',margins=c(4.1,4.1,.1,0.1))
+	plotCommon('hb.mean',margins=c(0.4,4.1,.1,0.1))
 
 	mar.res[[nm]]=var.data
 }
 dev.off() # margins.pdf
 
-crtn=do.call(rbind,mar.res)
+# 2026-06-06 In the large scale, above happens the estimation: margins -> crtn
+# margins + annual.hb -> hb.dev~level -> crtn (country,sex,var,level + estimates)
+crtn=do.call(rbind,mar.res) %>% filter(name=='hb.dev')
 crtn$level=as.character(crtn$level)
 
 # the difference is computed as observed-expected
@@ -465,14 +526,9 @@ crtn.annual=crtn.mean %>%
 # plotByGroups(crtn.annual,group.cols=c('sex','country'),xcol='year',ycols=c('correction'),colours=list(Male='blue3',Female='red3'))
 
 hb.dummy=annual.hb %>%
-	filter(data.set=='donation0') %>%
-	inner_join(conversions.df,join_by(country)) %>% # nb! are the conversions applied again?
-	mutate(hb=rate*hb) # %>%
-	# inner_join(use.years,join_by(country,between(year,y$year.min,y$year.max))) %>%
-	# select(-year.min) %>%
-	# select(-year.max)
-
-# plotByGroups(hb.dummy,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=list(Male='blue3',Female='red3'))
+	filter(data.set=='donation0') # %>%
+	# inner_join(conversions.df,join_by(country)) %>% # nb! are the conversions applied again?
+	# mutate(hb=rate*hb) 
 
 hb.cmp=inner_join(crtn.annual,hb.dummy,join_by(data.set,sex,country,year,)) %>%
 	mutate(hb=hb+correction,country=paste0(country,'-corrected')) %>%
@@ -483,9 +539,15 @@ hb.cmp=inner_join(crtn.annual,hb.dummy,join_by(data.set,sex,country,year,)) %>%
 # crtn.annual %>% filter(country=='fi') %>% summarize(min(year))
 # source('src/analysis-functions.r')
 
+# pdf('results/trends-corrected.pdf',width=12)
+# par(mar=c(4,4,0.5,0.6)) # no space at the top; bottom,left,top,right bottom 2.2->0
+# sms=plotByGroups(df.lst,group.cols=c('sex','country'),xcol='year',ycols=c('Estimate','lower','upper'),colours=colours,colour.col='country',trends='table',legend.position='left')
+# dev.off()
+
 pdf('results/trends-corrected.pdf',width=12)
 par(mar=c(4,4,0.5,0.6)) # no space at the top; bottom,left,top,right bottom 2.2->0
-sms=plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=colours,colour.col='country',trends='table')
+# sms=plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=colours,colour.col='country',trends='table',legend.position='left')
+sms=plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb','lower','upper'),colours=colours,colour.col='country',trends='table',legend.position='left',draw.confint=TRUE)
 dev.off()
 
 trends.table = sms %>% 
@@ -496,7 +558,9 @@ trends.table = sms %>%
 	# rename(p.value=Pr...t.) %>%
 	dplyr::select(country,sex,corrected,Estimate,p.value) %>%
 	mutate(p.value=round(p.value,4)) %>%
-	arrange(desc(corrected))
+	arrange(desc(corrected)) %>%
+	mutate(country=cn.names[[country]])
+
 wh=which(trends.table$p.value<0.05)
 if (length(wh) > 0) {
 	trends.table$p.value[wh]=paste0('¤',trends.table$p.value[wh],'%')
@@ -535,13 +599,10 @@ ctb3
 # i specifies the colour
 # the rows represent the individual cells
 # all can be done at once
-# maybe ctb3 must 
+# maybe ctb3 must ...
+# hadj is the vector of horizontal adjustments for the text function
+# cdws~column widths
 plot.et.data = function(etd,cwds=NULL,hadj=0,bold.first.row=TRUE) {
-bsAssign('etd')
-bsAssign('cwds')
-bsAssign('hadj')
-bsAssign('bold.first.row')
-
 	# etd=vls.df
 	ncols=length(table(etd$x))
 	if (is.null(cwds)) 
@@ -564,16 +625,13 @@ bsAssign('bold.first.row')
 		return()
 	}
 
-	# etd$x-0.5, etd$x-0.5+1
 	rect(etd$x0,etd$y-0.5,etd$x1,etd$y-0.5+1,col=col_vector[etd$col],border='white')
-	# etd$x, (etd$x0+etd$x1)/2
-	# text((etd$x0+etd$x1)/2,etd$y,labels=etd$value,cex=0.75)
-
 	etd$font=0
 	if (bold.first.row)
 		etd$font[etd$y==1]=2
 
 	by(etd,etd[,c('hadj','font')],function(etd.by) {
+		etd.by=etd.by %>% filter(!is.na(value),value!='NA')
 		ha=etd.by$hadj[1]
 		text((1-ha)*etd.by$x0+ha*etd.by$x1,etd.by$y,labels=etd.by$value,cex=0.75,font=etd.by$font[1]) # 1 
 	})
@@ -581,12 +639,10 @@ bsAssign('bold.first.row')
 
 library(RColorBrewer)
 
-# ctb4=ctb3
-# ctb4$y=1:nrow(ctb3)
+# 2026-06-27 How the heatmap is formed: ctb3 contains the table as it should be printed
 inx=expand.grid(row=1:nrow(ctb3),col=1:ncol(ctb3))
 vls=lapply(1:nrow(inx),function(x) data.frame(y=inx[x,'row'],x=inx[x,'col'],value=as.character(ctb3[inx[x,'row'],inx[x,'col']])))
 vls.df=do.call(rbind,vls)
-vls.df[1:10,]
 vls.df$col=NA
 
 col.minus=colorRampPalette(colors=c('red','white'))(30)
@@ -616,10 +672,7 @@ country.y=unique(vls.df[,c('value','y')] %>% filter(value %in% cn.names))
 lbc=vls.df %>%
 	left_join(country.y,join_by(y),suffix=c('','.country'))
 
-source('src/plot.et.data-draft.r')
-
 by(lbc,lbc$value.country,function(x) {
-bsAssign('x')
 	if (nrow(x) == 1)
 		return(NULL)
 
@@ -640,8 +693,3 @@ bsAssign('x')
 	plot.et.data(x,col.widths.sg,hadj=0.5)
 	dev.off()
 })
-
-# pdata=pivot_longer(dfdona,cols=starts_with('X'),names_to='year',names_prefix='X',values_to='donations') %>%
-# pivot_longer(ctb3,cols=colnames(ctb3),names_to=
-
-# nb! Should produce the heatmap tables in R instead to make it automatic
