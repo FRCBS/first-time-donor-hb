@@ -20,7 +20,7 @@ dir.create(file.path(param$wd,"log"),showWarnings = FALSE)
 param$result.file = file.path(param$wd,"results","exported-data.xlsx")
 
 # nb! Please edit your country code below
-param$country = 'NV'
+param$country = 'FI'
 
 param$omit.data=list()
 param$max.ord.group.number=15
@@ -88,8 +88,14 @@ if (param$country == 'NL') {
   param$donation.type.keys = c('Whole Blood (K)','No Donation (E)','VisitNoDonation')
   param$donation.type.keys.survival=c("Whole Blood (K)")
   param$hb.decimals = 0
-  param$extractHour = function(simple) {
-    return(as.integer(format(simple$DonationTimeDTTM,'%H')))
+
+  param$extractHour = function(simple) { 
+	rv=simple %>% 
+		mutate(hour=as.integer(format(DonationTimeDTTM,'%H'))) %>%
+		mutate(dst0=1*dst(as.POSIXct(DonationDate,tz='EET')),convert=1*(DonationDate<'2020-05-04')) %>% 
+		mutate(hour0=hour,hour=hour+2-2*convert-1*dst0*convert)
+	rv$hour[rv$hour<0]=0
+	return(rv$hour)
   }
   param$donor.cols = c('DateOfBirth','Sex','BloodGroup')
   param$donation.cols = c('DonationTimeDTTM')
@@ -507,8 +513,6 @@ dlink$dummy=NULL
 ###
 
 do.coxph.inner = function(data0) {
-data00=data0
-bsAssign('data00')
 	hb.var=colnames(data0)[ncol(data0)]
 
 	if(hb.var != 'sex') {
@@ -517,8 +521,7 @@ bsAssign('data00')
 		sex0='Female'
 	}
 	
-
-print(paste(hb.var,sex0,data0$ord.group[1]))
+	print(paste(hb.var,sex0,data0$ord.group[1]))
 
 	breaks.str='-'
 
@@ -553,7 +556,6 @@ print(paste(hb.var,sex0,data0$ord.group[1]))
 			dplyr::select(-ord.group,-sex)
 	}
 
-bsAssign('data0')
 	m=coxph(Surv(diff,event)~.,data=data0)
 
 	if (ncol(data0)==2) {
