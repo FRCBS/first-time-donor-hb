@@ -17,11 +17,14 @@ redat.list=lapply(names(countries.surv),function(x) {
 redat=do.call(rbind,redat.list)
 
 cn.models.list=by(redat,redat[,c('sex','ord')],function(x) {
-# bsAssign('x')
+bsAssign('x')
 	hb.var='country'
 	m=coxph(Surv(time,event)~country,data=x,weights=weight)
 	sm=summary(m)
 	df=data.frame(sm$coeff)
+	df=cbind(df,sm$conf.int)
+	colnames(df)=sub(' \\.','..',colnames(df))
+
 	var='country'
 	level=sub(hb.var,'',rownames(df))
 	sex0=x$sex[1]
@@ -43,7 +46,7 @@ by(cn.models,cn.models$sex,function(cnm0) {
 	pdf(paste0('results/survival-cn0-',sex0,'.pdf'),width=7,heigh=5)
 	par(mar=c(4.1,4.1,0.2,0.1)) # modifired measures with left and bottom margins for labels and some at top for y-axis labels
 	par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
-	plotByGroups(cnm0,xcol='ord.group',ycols='exp.coef.',group.cols=c('sex','country'),trends='',y.lim=ylim,
+	plotByGroups(cnm0,xcol='ord.group',ycols=c('exp.coef.','lower..95','upper..95'),group.cols=c('sex','country'),trends='',y.lim=ylim,draw.confint=TRUE,
 		colours=colours,colour.col='country',xlab='number of donations',ylab='relative likelihood of next donation')
 	abline(h=1,lty='dashed')
 	dev.off()
@@ -126,7 +129,10 @@ lapply(rownames(vl.comb),function(x) {
 				main=''
 			}
 			
-			plotByGroups(y,group.cols=c(NA,'country'),xcol='ord',ycols=ycols,y.lim=ylim,
+
+bsAssign('y')
+bsAssign('ycols')
+			plotByGroups(y,group.cols=c(NA,'country'),xcol='ord',ycols=ycols,y.lim=ylim,draw.confint=TRUE,
 				colours=colours,ltys=ltys,main=main,trends='',legend.position=legend.position,
 				extras.fun=hr.plot.extras.fun,x.max=x$x.max,xlab='number of donations',ylab='relative likelihood of next donation')
 
@@ -257,5 +263,5 @@ sapply(unique(res.models$country),plotSurvivalCurvesByCountry)
 cairo_pdf('results/survival-sample-age.group.t-fi-female.pdf',width=7,heigh=5)
 par(mar=c(4.1,4.1,0.2,0.1)) # modifired measures with left and bottom margins for labels and some at top for y-axis labels
 par(cex=1.10,cex.axis=1.10,cex.lab=1.10)
-plotSurvivalCurvesByCountry('fi',plot.what='figures',filters=list(sex='Female',var='age.group.t'),pdf.internal=FALSE,draw.confint=FALSE)
+plotSurvivalCurvesByCountry('fi',plot.what='figures',filters=list(sex='Female',var='age.group.t'),pdf.internal=FALSE,draw.confint=TRUE)
 dev.off()
