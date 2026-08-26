@@ -714,7 +714,7 @@ distHeatmap = function(var0,country0,filename='results/dist-heatmap-¤var-¤coun
 	level.cols=as.character(level.cols)
 	dist.hm[,level.cols]=round(dist.hm[,level.cols],2)
 	dist.hm %>% data.frame()
-bsAssign('dist.hm')
+
 	sbs=do.call(cbind,by(dist.hm,dist.hm$sex,function(x) x)) 
 	use.columns=grep('([0-9]$)|Female.year|Male.sex',colnames(sbs),value=TRUE)
 	dist.hm=sbs %>% 
@@ -744,8 +744,6 @@ bsAssign('dist.hm')
 	length(col_vector)
 
 	# The expansion by 1/1000 is needed to get a colour for the maximum value as well
-bsAssign('col_vector')
-bsAssign('vls.df')
 	value.seq=seq(from=-1.001*abs.max,to=1.001*abs.max,len=length(col_vector))
 	wh=which(grepl('^-?[0-9](\\.[0-9]+)?$',vls.df$value))
 	cols=left_join(data.frame(value=as.numeric(vls.df$value[wh])),data.frame(inx=1:length(value.seq),tb=value.seq),join_by(closest(x$value<y$tb))) %>% 
@@ -757,7 +755,6 @@ bsAssign('vls.df')
 	vls.df$value[wh]=NA # dont' print the labels here
 	table(vls.df$value,useNA='ifany')
 
-	str(vls.df)
 	vls.df$value=sub('^header','',vls.df$value)
 
 	col.widths=rep(1,ncol(dist.hm)) # c(5,3,rep(1,ncol(dist.hm)-2))
@@ -785,6 +782,5 @@ bsAssign('vls.df')
 dist.year %>%
 	group_by(country,var) %>%
 	summarise(min.level=min(level,na.rm=TRUE),max.level=max(level,na.rm=TRUE),.groups='drop') %>%
-	# rowwise() %>%
 	filter(min.level!=max.level) %>%
 	apply(1,function(x) {bsAssign('x'); str(x); print(x); distHeatmap(x[['var']],cn.names[[x[['country']]]])})

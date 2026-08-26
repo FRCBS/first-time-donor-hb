@@ -31,12 +31,12 @@ html.table.ml='<table><tr>
 
 </table>'
 
-captions$figure.ml="<b>Figure ML</b> Levels and estimated deviations by age and sex 
+captions$figure.ml="<b>Figure 2</b> Levels and estimated deviations by age and sex 
 (females on left, males on right). See legend for colours in top-left panel."
 
 html.file=sub('¤table¤',paste(html.table.ml,if(include.captions) captions$figure.ml else '',sep='\n'),html.template)
 # source('src/analysis-functions.r')
-convertOutput(html.file,file=paste0(param$shared.dir,'figure-ml levels margins.html'))
+convertOutput(html.file,file=paste0(param$shared.dir,'figure-hb-2 levels margins.html'))
 
 ### heatmaps
 
@@ -54,14 +54,14 @@ html.table.h='<table><tr>
 <td>(e) Netherlands</td> </tr><tr>
 </table>'
 
-captions$figure.h="<b>Figure H</b> Heatmaps for the blood establishments, panels&nbsp;(a) through&nbsp;(e). Red tones 
+captions$figure.h="<b>Figure 3</b> Heatmaps for the blood establishments, panels&nbsp;(a) through&nbsp;(e). Red tones 
 indicate negative and blue tones positive corrections that are added to the mean hemoglobin values to 
 achieve corrected hemoglobin values. All units in g/L. The heatmaps show that overall, largest corrections 
 are due to age and changes in the age distribution over the years. The rectification of distributions produces 
 noticable but rather constant corrections (where applicable)."
 
 html.file=sub('¤table¤',paste(html.table.h,if(include.captions) captions$figure.h else '',sep='\n'),html.template)
-convertOutput(html.file,file=paste0(param$shared.dir,'figure-h heatmaps.html'))
+convertOutput(html.file,file=paste0(param$shared.dir,'figure-hb-3 heatmaps.html'))
 
 # D-figures
 
@@ -84,7 +84,7 @@ Red tones is for females and blue tones for males. Darker tones imply high numbe
 html.file=sub('¤table¤',paste(html.table.d,if(include.captions) captions$figure.d else '',sep='\n'),html.template)
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-d heatmaps-by-age.html'))
 
-html.table.ml='<table><tr>
+html.table.d2='<table><tr>
 <td><img width=1800 src="../results/dist-heatmap-hour-Finland"></td> </tr><tr>
 <td>(a) Finland</td> </tr><tr>
 <td><img width=1800 src="../results/dist-heatmap-hour-Navarre"></td> </tr><tr>
@@ -96,7 +96,7 @@ html.table.ml='<table><tr>
 captions$figure.d2="<b>Figure D2</b> Heatmaps of the distribution of hour of donation by sex and year for the blood establishments, panels&nbsp;(a) through&nbsp;(e). 
 Red tones is for females and blue tones for males. Darker tones imply high number of donations."
 
-html.file=sub('¤table¤',paste(html.table.ml,if(include.captions) captions$figure.d2 else '',sep='\n'),html.template)
+html.file=sub('¤table¤',paste(html.table.d2,if(include.captions) captions$figure.d2 else '',sep='\n'),html.template)
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-d2 heatmaps-by-hour.html'))
 
 #### trends
@@ -106,17 +106,17 @@ html.table.t='<table><tr>
 <td><img width=1800 src="../results/trends-corrected.pdf"></td> </tr>
 </table>'
 
-captions$figure.t="<b>Figure T</b> Mean (solid lines) and corrected (dashed lines) hemoglobin levels. <br>Fitted trend lines have been added where there is a statistically significant trend."
+captions$figure.t="<b>Figure 4</b> Mean (solid lines) and corrected (dashed lines) hemoglobin levels. <br>Fitted trend lines have been added where there is a statistically significant trend in the corrected data."
 
 html.file=sub('¤table¤',paste(html.table.t,if(include.captions) captions$figure.t else '',sep='\n'),html.template)
-convertOutput(html.file,file=paste0(param$shared.dir,'figure-t trends.html'))
+convertOutput(html.file,file=paste0(param$shared.dir,'figure-hb-4 trends.html'))
 
 # example rectification
 html.table.r='<table><tr>
 <td><img width=900 src="../results/rectify-distribution-sample.pdf"></td> </tr>
 </table>'
 
-captions$figure.r="<b>Figure R</b> Example of hemoglobin distribution: Finland, year 2013, females. 
+captions$figure.r="<b>Figure 1</b> Example of hemoglobin distribution: Finland, year 2013, females. 
 The black line shows the original distribution with an artefact caused by remeasurement after an 
 initial measurement below the cutoff value (125 g/L, green vertical line). 
 The post-rectification distribution is drawn in red. The mean values of the original and rectified 
@@ -125,7 +125,7 @@ The normal distribution following the mean and standard deviation of the rectifi
 illustrated with red, dotted line."
 
 html.file=sub('¤table¤',paste(html.table.r,if(include.captions) captions$figure.r else '',sep='\n'),html.template)
-convertOutput(html.file,file=paste0(param$shared.dir,'figure-r rectification.html'),page.width=10)
+convertOutput(html.file,file=paste0(param$shared.dir,'figure-hb-1 rectification.html'),page.width=10)
 
 #### Table 1
 table1=annual.hb %>%
@@ -145,7 +145,8 @@ html.table1=paste(capture.output(print(xtable(table1,align=c('l',rep('r',ncol(ta
 html.table1=gsub('&amp;','&',html.table1)
 caption='<b>Table 1</b> Number of new donors per country and year. Years with their number in parentheses were not used in the analysis.'
 html.file=sub('¤table¤',paste0(caption,'\n',html.table1),html.template)
-cat(html.file,file=paste0(param$shared.dir,'table-1.html'))
+# cat(html.file,file=paste0(param$shared.dir,'table-1.html'))
+# 2026-08-22 This is not used anymore
 
 ##### survival
 
@@ -208,44 +209,122 @@ compared with the reference age group of 41 to 45 years.
 html.file=sub('¤table¤',paste(html.table.s,if(include.captions) captions$figure.s else '',sep='\n'),html.template)
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-s relative survival.html'))
 
+#### Figures S1 and S2
+##### survival
+
+# relative curves
+
+html.table.s1='<table><tr>
+<td><img width=500 src="../results/survival-joint-ord.group.full-Female-NA.png"></td>
+<td><img width=500 src="../results/survival-joint-ord.group.full-Male-NA.png"></td> </tr><tr>
+
+<td colspan="2">(a) Relative to first donation: females on left, males on right </td>  </tr><tr>
+
+<td><img width=500 src="../results/survival-joint-bloodgr-Female-NA.png"></td>
+<td><img width=500 src="../results/survival-joint-bloodgr-Male-NA.png"></td> </tr><tr>
+
+<td colspan="2">(b) Relative to O-donors: females on left, males on right </td>  </tr><tr>
+
+<td><img width=500 src="../results/survival-joint-age.group.t-Female--15-20-.png"></td>
+<td><img width=500 src="../results/survival-joint-age.group.t-Male--15-20-.png"></td> </tr><tr>
+
+<td colspan="2">(c) Donors up to 20 years of age relative to donors from 41 to 45 years of age: females on left, males on right </td>  </tr><tr>
+
+<td><img width=500 src="../results/survival-joint-hb.surplus-Female-bottom-10-.png"></td>
+<td><img width=500 src="../results/survival-joint-hb.surplus-Male-bottom-10-.png"></td> </tr><tr>
+
+<td colspan="2">(d) Lowest 10% of hemoglobin compared with mid 50%: females on left, males on right </td>  </tr><tr>
+
+</table>'
+
+html.table.s2='<table><tr>
+<td><img width=500 src="../results/survival-joint-sex-Female-NA.png"></td>
+<td><img width=500 src="../results/survival-sample-age.group.t-fi-female.png"></td> </tr>
+
+<td>(a) Males with females as reference group</td>
+<td>(b) Relative to donors of 41 to 45 years of age</td> </tr><tr>
+
+<td><img width=500 src="../results/survival-cn0-Female.png"></td>
+<td><img width=500 src="../results/survival-cn0-Male.png"></td> </tr>
+
+<td colspan="2">(c) Relative to Australia: females on left, males on right </td>  </tr><tr>
+
+</table>'
+
+# <td><img width=500 src="../results/survival-joint-hb.surplus-Female-bottom-10-.png"></td>
+# <td><img width=500 src="../results/survival-joint-hb.surplus-Male-bottom-10-.png"></td> </tr><tr>
+# <td>(i)</td>
+# <td>(j)</td> </tr><tr>
+
+captions$figure.s1="<b>Figure 1</b> Relative retention by various groupings as a function of the number of donation with 
+confidence intervals (dashed). A value above the horizontal dashed line marking relative retention equals 1 implies 
+that the group is more likely to return than the reference group. See panel legends for group variables and reference groups."
+
+# (a)&nbsp;Relative likelikelihood of next donation after the second etc. donation compared with after the first donation for females and males.
+# (b)&nbsp;Relative likehood of retention for females and males, respectively, for O negative blood group compared with all other blood groups as reference,
+# (c)&nbsp;Relative likehood of retention for females and males, respectively, in age of at most 20 years at donation, 
+# compared with the reference age group of 41 to 45 years. 
+# (d)&nbsp;Similarly for bottom decile of hemoglobin surplus (excess to threshold) with the mid-50% fractile as reference.
+# "
+
+# captions$figure.s2="<b>Figure S2</b> (a)&nbsp;Similarly for males, with females as reference group, 
+# (b)&nbsp;example (Finnish females) of relative likelihoods of retention for age groups (at donation), with 41 to 45 as reference,
+# (c)&nbsp;relative likelihood of retention for females and males, for different blood establishments (Australia as reference)"
+
+captions$figure.s2="<b>Figure 2</b> Relative retention by various groupings as a function of the number of donation with 
+confidence intervals (dashed). A value above the horizontal dashed line marking relative retention equals 1 implies 
+that the group is more likely to return than the reference group. See panel legends for more details."
+
+
+html.file=sub('¤table¤',paste(html.table.s1,if(include.captions) captions$figure.s1 else '',sep='\n'),html.template)
+convertOutput(html.file,file=paste0(param$shared.dir,'figure-surv-1 relative survival basic.html'))
+
+html.file=sub('¤table¤',paste(html.table.s2,if(include.captions) captions$figure.s2 else '',sep='\n'),html.template)
+convertOutput(html.file,file=paste0(param$shared.dir,'figure-surv-2 relative survival special.html'))
+
+############### S1/S2
+
 # curves and parameters
 
 html.table.c='<table><tr>
 <td><img width=500 src="../results/survival-curves-1-Female.png"></td>
 <td><img width=500 src="../results/survival-curves-1-Male.png"></td> </tr><tr>
 
-<td colspan="2">(a)&nbsp;Retention after the first donation, females (left) and males</td>  </tr><tr>
+<td colspan="2">(a)&nbsp;Retention after the first donation, females (left) and males (right)</td>  </tr><tr>
 
 <td><img width=500 src="../results/survival-curves-16-Female.png"></td>
 <td><img width=500 src="../results/survival-curves-16-Male.png"></td> </tr><tr>
 
-<td colspan="2">(b)&nbsp;Retention after 16 or more donations</td>  </tr><tr>
+<td colspan="2">(b)&nbsp;Retention after 16 or more donations, females (left) and males (right)</td>  </tr><tr>
 
 <td><img width=500 src="../results/survival-parameters-Female.png"></td>
 <td><img width=500 src="../results/survival-parameters-Male.png"></td> </tr>
 
-<td colspan="2">(c)Parameters estimated from the asymptotic regression model</td>  </tr><tr>
+<td colspan="2">(c)&nbsp;Parameters estimated from the asymptotic regression model, females (left) and males (right)</td>  </tr><tr>
 
 </table>'
 
 frml.latex='$S(t)=a+(R_0–a)\\cdot \\exp\\{–\\exp(lrc)\\cdot \\sqrt{t}\\}$'
 frml.html='S(t)=a+(R<sub>0</sub>–a)·exp{–exp(lrc)·sqrt(t)}'
-captions$figure.c="<b>Figure C</b> Survival as a function of time for (a)&nbsp;1 and 
+captions$figure.c="<b>Figure 3</b> Survival as a function of time for (a)&nbsp;1 and 
 (b)&nbsp;16 previous donations. Data for females on the left and males on the right. Top row: retention after
 first donation. Second row: retention after 16 or more donations. Legend for colours in bottom row. While there are significant differences 
 between blood establishments in retention after first donation, the differences tend to vanish with 
 increasing number of donations. This phenomenon can also be seen from the parameter estimates at the bottom 
 row, where the trajectories converge towards the bottom-right corner for all blood establishments. 
-(c) Parameters estimated from the model ¤frml for each country, sex and number of previous donations."
+(c) Parameters estimated from the model ¤frml for each country, sex and number of previous donations. 
+Lighter tones correspond to larger number of donations (<i>ord</i>). While the parameter estimates differ significantly 
+at the early stages of donor careers, they converge towards the right-bottom corner at later stages."
+
 html.file=sub('¤table¤',paste(html.table.c,if(include.captions) sub('¤frml',frml.latex,captions$figure.c,fixed=TRUE) else '',sep='\n'),html.template,fixed=TRUE)
-cat(html.file)
-convertOutput(html.file,file=paste0(param$shared.dir,'figure-c curves.html'))
+convertOutput(html.file,file=paste0(param$shared.dir,'figure-surv-3 curves.html'))
 captions$figure.c=sub('¤frml',frml.html,captions$figure.c,fixed=TRUE)
 
 # table 1 (for survival)
-getCountriesStats = function(var) {
+getCountriesStats = function(var,from.variable='countries.surv') {
+	data.source=get(from.variable)
 	stats.list=lapply(names(countries.surv),function(x) {
-		countries.surv[[x]][[var]] %>%
+		data.source[[x]][[var]] %>%
 			# rowwise() %>%
 			# filter(grepl('cutoff',name)) %>%
 			mutate(country=x,var=var) %>%
@@ -287,6 +366,15 @@ st.age.t=stats.age.t %>%
 	mutate(var='Mean age at donation',value=round(value,2)) %>%
 	pivot_wider(names_from='country',values_from='value')
 
+st.hb=stats.age.t %>%
+	group_by(country,sex,var) %>%
+	filter(!is.na(age)) %>%
+	summarise(value=sum(n*mean.hb)/sum(n),.groups='drop') %>%
+	inner_join(conversions.df,join_by(country)) %>%
+	mutate(var='Mean hemoglobin',value=round(value*rate,2)) %>%
+	dplyr::select(-rate) %>%
+	pivot_wider(names_from='country',values_from='value')
+
 st.age0=stats.age %>%
 	group_by(country,sex,var) %>%
 	filter(!is.na(age)) %>%
@@ -294,7 +382,7 @@ st.age0=stats.age %>%
 	mutate(var='Mean age at first donation',value=round(value,2)) %>%
 	pivot_wider(names_from='country',values_from='value')
 
-st.all=rbind(st.donor,st.donations,st.age.t) %>%
+st.all=rbind(st.donor,st.donations,st.age.t,st.hb) %>%
 	mutate(ord=row_number()) %>%
 	arrange(sex,ord) %>%
 	rowwise() %>%
@@ -305,9 +393,71 @@ colnames(st.all)[2]='Quantity'
 colnames(st.all)=firstUp(colnames(st.all))
 st.all
 
+# Table 1 (for hb)
+stats.annual.hb=getCountriesStats('annual.hb','countries') 
+wh.age=which(colnames(stats.annual.hb)=='age')
+colnames(stats.annual.hb)[wh.age]=c('mean.age','sd.age')
+colnames(stats.annual.hb)=tolower(colnames(stats.annual.hb))
+stats.annual.hb = stats.annual.hb %>% filter(data.set=='donation0')
+
+stats.annual.age=getCountriesStats('annual.age','countries') %>% filter(data.set=='donation0')
+colnames(stats.annual.age)=tolower(colnames(stats.annual.age))
+
+st.donor.hb= stats.annual.hb %>%
+	group_by(country,sex,var) %>%
+	# filter(ord==1) %>%
+	summarise(value=sum(n),.groups='drop') %>%
+	mutate(var='Donors (in 1,000)',value=as.character(value/1000)) %>%
+	pivot_wider(names_from='country',values_from='value')
+
+st.age.hb=stats.annual.age %>%
+	group_by(country,sex,var) %>%
+	filter(!is.na(age)) %>%
+	summarise(value=sum(n*age)/sum(n),.groups='drop') %>%
+	mutate(var='Mean age at donation',value=round(value,2)) %>%
+	pivot_wider(names_from='country',values_from='value')
+
+st.hb.hb=stats.annual.hb %>%
+	group_by(country,sex,var) %>%
+	filter(abs(hb)<10000) %>%
+	summarise(value=sum(n*hb)/sum(n),.groups='drop') %>%
+	inner_join(conversions.df,join_by(country)) %>%
+	mutate(var='Mean hemoglobin',value=round(value*rate,2)) %>%
+	dplyr::select(-rate) %>%
+	pivot_wider(names_from='country',values_from='value')
+
+st.all.hb=rbind(st.donor.hb,st.age.hb,st.hb) %>%
+	mutate(ord=row_number()) %>%
+	arrange(sex,ord) %>%
+	rowwise() %>%
+	mutate(sex=if (ord > 2) '' else sex) %>%
+	dplyr::select(-ord)
+colnames(st.all.hb)[-(1:2)]=sapply(colnames(st.all.hb)[-(1:2)],function(x) cn.names[[x]])
+colnames(st.all.hb)[2]='Quantity'
+colnames(st.all.hb)=firstUp(colnames(st.all.hb))
 
 html.table1.s=paste(capture.output(print(xtable(st.all,align=c('l','l',rep('r',ncol(st.all)-1))),type='html',include.rownames=FALSE)),collapse='\n')
 html.table1.s=gsub('&amp;','&',html.table1.s)
-caption='<b>Table 1S</b> Descriptive statistics of study sample'
+caption='<b>Table 1</b> Descriptive statistics of study sample'
 html.file.1s=sub('¤table¤',paste0(caption,'\n',html.table1.s),html.template)
 cat(html.file.1s,file=paste0(param$shared.dir,'table-1 survival.html'))
+
+html.table1.s=paste(capture.output(print(xtable(st.all.hb,align=c('l','l',rep('r',ncol(st.all.hb)-1))),type='html',include.rownames=FALSE)),collapse='\n')
+html.table1.s=gsub('&amp;','&',html.table1.s)
+caption='<b>Table 1</b> Descriptive statistics of study sample'
+html.file.1s=sub('¤table¤',paste0(caption,'\n',html.table1.s),html.template)
+cat(html.file.1s,file=paste0(param$shared.dir,'table-1 hb.html'))
+
+# Numbers for abstracts
+# hb
+stats.annual.hb %>% summarise(sum(n))
+
+
+stats.ord %>%
+	# group_by(country,sex,var) %>%
+	filter(ord==1) %>%
+	summarise(value=max(n),.groups='drop')
+
+stats.ord %>%
+# 	group_by(country,sex,var) %>%
+	summarise(value=sum(n),.groups='drop')

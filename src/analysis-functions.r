@@ -145,7 +145,9 @@ plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c(
 					b=rdf[2,1]
 					n=length(x[[xcol]])
 					# abline(a=rdf[1,1],b=rdf[2,1])
-					lines(c(x[[xcol]][1],x[[xcol]][n]),c(a+b*x[[xcol]][1],a+b*x[[xcol]][n]),col=col0,lwd=1,lty='dashed')
+
+					# 2026-08-18 This draws the trend lines
+					lines(c(x[[xcol]][1],x[[xcol]][n]),c(a+b*x[[xcol]][1],a+b*x[[xcol]][n]),col=col0,lwd=3,lty='dotted')
 				}
 
 				return(rdf)

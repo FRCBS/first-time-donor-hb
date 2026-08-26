@@ -1,3 +1,9 @@
+# 2026-08-06
+# trend lines more prominent OK
+# adjust the scales in the parameters plot
+#  * maybe transformation to make things more evenly spaced instead of bottom-left packed
+#  * same horizontal axis for both sexes
+
 setwd('c:/hy-version/first-time-donor-hb')
 
 rm(list=ls())
@@ -9,7 +15,6 @@ source('src/read-hb-data.r')
 source('src/analysis.r') # survival part
 
 source('src/compile-results.r') # survival part
-
 
 # Things to do
 # Check the distributions
