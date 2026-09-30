@@ -47,7 +47,7 @@ by(cn.models,cn.models$sex,function(cnm0) {
 	par(mar=c(4.1,4.1,0.2,0.1)) # modifired measures with left and bottom margins for labels and some at top for y-axis labels
 	par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
 	plotByGroups(cnm0,xcol='ord.group',ycols=c('exp.coef.','lower..95','upper..95'),group.cols=c('sex','country'),trends='',y.lim=ylim,draw.confint=TRUE,
-		colours=colours,colour.col='country',xlab='number of donations',ylab='relative likelihood of next donation')
+		colours=colours,colour.col='country',xlab='number of donations',ylab='hazard/return ratio')
 	abline(h=1,lty='dashed')
 	dev.off()
 })
@@ -134,7 +134,7 @@ bsAssign('y')
 bsAssign('ycols')
 			plotByGroups(y,group.cols=c(NA,'country'),xcol='ord',ycols=ycols,y.lim=ylim,draw.confint=TRUE,
 				colours=colours,ltys=ltys,main=main,trends='',legend.position=legend.position,
-				extras.fun=hr.plot.extras.fun,x.max=x$x.max,xlab='number of donations',ylab='relative likelihood of next donation')
+				extras.fun=hr.plot.extras.fun,x.max=x$x.max,xlab='number of donations',ylab='hazard/return ratio')
 
 			if (local.plot)
 				dev.off()

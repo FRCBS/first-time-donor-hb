@@ -147,7 +147,7 @@ plotByGroups = function(data,group.cols=c('sex','country'),xcol='level',ycols=c(
 					# abline(a=rdf[1,1],b=rdf[2,1])
 
 					# 2026-08-18 This draws the trend lines
-					lines(c(x[[xcol]][1],x[[xcol]][n]),c(a+b*x[[xcol]][1],a+b*x[[xcol]][n]),col=col0,lwd=3,lty='dotted')
+					lines(c(x[[xcol]][1],x[[xcol]][n]),c(a+b*x[[xcol]][1],a+b*x[[xcol]][n]),col=col0,lwd=3,lty='solid')
 				}
 
 				return(rdf)
@@ -300,7 +300,7 @@ bsAssign('res.models.all')
 		y.delta=ylim[2]-ylim[1]
 		ylim=c(ylim[1]-0.3*y.delta,ylim[2]+0.2*y.delta)
 		plot(x=NULL,type='n',xlim=c(1,max(y$ord)),ylim=ylim,main=if (pdf.internal) paste(y$sex[1],y$var[1]) else '',
-			xlab='number of donations',ylab='relative likelihood of next donation')
+			xlab='number of donations',ylab='hazard/return ratio')
 		abline(h=1,lwd=1,lty='dashed')
 		breaks=y$breaks[1]
 
@@ -644,11 +644,14 @@ bsAssign('filename')
 	oldwd = getwd()
 	setwd(workdir)
 
+	content0=gsub('\\\\  \\\\','\\',content)
+cat(content0)
+
 	tex.file = sub('.pdf$','.tex',filename)
 
 	pdflatex = 'C:\\Users\\super\\AppData\\Local\\Programs\\MiKTeX\\miktex\\bin\\x64\\pdflatex.exe'
 
-	cat(content,file=tex.file)
+	cat(content0,file=tex.file)
 	system(paste(pdflatex,paste0('"',tex.file,'"')),intern=TRUE)
 	setwd(oldwd)
 }

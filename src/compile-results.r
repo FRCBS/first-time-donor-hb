@@ -13,25 +13,25 @@ html.table.ml='<table><tr>
 <td><img width=500 src="../results/hb-margins-age-Female.png"></td>
 <td><img width=500 src="../results/hb-margins-age-Male.png"></td> </tr><tr>
 
-<td colspan="2">(a)</td>  </tr><tr>
+<td colspan="2">(a) By age</td>  </tr><tr>
 
 <td><img width=500 src="../results/hb-levels-month-Female.png"></td>
 <td><img width=500 src="../results/hb-levels-month-Male.png"></td> </tr><tr>
 <td><img width=500 src="../results/hb-margins-month-Female.png"></td>
 <td><img width=500 src="../results/hb-margins-month-Male.png"></td> </tr><tr>
 
-<td colspan="2">(b)</td>  </tr><tr>
+<td colspan="2">(b) By month of donation</td> </tr><tr>
 
 <td><img width=500 src="../results/hb-levels-hour-Female.png"></td>
 <td><img width=500 src="../results/hb-levels-hour-Male.png"></td> </tr><tr>
 <td><img width=500 src="../results/hb-margins-hour-Female.png"></td>
 <td><img width=500 src="../results/hb-margins-hour-Male.png"></td> </tr>
 
-<td colspan="2">(c)</td>  </tr><tr>
+<td colspan="2">(c) By hour of donation</td>  </tr><tr>
 
 </table>'
 
-captions$figure.ml="<b>Figure 2</b> Levels and estimated deviations by age and sex 
+captions$figure.ml="<b>Figure 2</b> Levels and estimated deviations by (a) age, (b) month and (c) hour of donation, and sex 
 (females on left, males on right). See legend for colours in top-left panel."
 
 html.file=sub('¤table¤',paste(html.table.ml,if(include.captions) captions$figure.ml else '',sep='\n'),html.template)
@@ -52,6 +52,27 @@ html.table.h='<table><tr>
 <td>(d) Navarre</td> </tr><tr>
 <td><img width=500 src="../results/heatmap-Netherlands"></td> </tr>
 <td>(e) Netherlands</td> </tr><tr>
+</table>'
+
+# New version, 2-wide
+html.table.h='<table><tr>
+<td><img width=500 src="../results/heatmap-Australia"></td>
+<td><img width=500 src="../results/heatmap-Finland"></td> </tr><tr>
+
+<td>(a)&nbsp;Australia</td>
+<td>(b)&nbsp;Finland</td> </tr><tr>
+
+<td><img width=500 src="../results/heatmap-Netherlands"></td>
+<td><img width=500 src="../results/heatmap-Navarre"></td> </tr><tr>
+
+<td>(c)&nbsp;Netherlands</td>
+<td>(d)&nbsp;Navarre</td> </tr><tr>
+
+<td><img width=500 src="../results/heatmap-France.png"></td>
+<td></td> </tr><tr>
+
+<td>(e)&nbsp;France</td>
+<td></td> </tr><tr>
 </table>'
 
 captions$figure.h="<b>Figure 3</b> Heatmaps for the blood establishments, panels&nbsp;(a) through&nbsp;(e). Red tones 
@@ -106,7 +127,7 @@ html.table.t='<table><tr>
 <td><img width=1800 src="../results/trends-corrected.pdf"></td> </tr>
 </table>'
 
-captions$figure.t="<b>Figure 4</b> Mean (solid lines) and corrected (dashed lines) hemoglobin levels. <br>Fitted trend lines have been added where there is a statistically significant trend in the corrected data."
+captions$figure.t="<b>Figure 4</b> Mean (solid lines) and corrected (dashed lines) hemoglobin levels. <br>Fitted trend lines (solid and straight) have been added where there is a statistically significant trend in the corrected data."
 
 html.file=sub('¤table¤',paste(html.table.t,if(include.captions) captions$figure.t else '',sep='\n'),html.template)
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-hb-4 trends.html'))
@@ -196,15 +217,15 @@ html.table.s='<table><tr>
 # <td>(i)</td>
 # <td>(j)</td> </tr><tr>
 
-captions$figure.s="<b>Figure S</b> Relative retention by various various groups: (a, b)&nbsp;Relative likelikelihood
+captions$figure.s="<b>Figure S</b>  by various various groups: (a, b)&nbsp;Relative likelikelihood
 of next donation after the second etc. donation compared with after the first donation for females and males.
-(c,d)&nbsp;Relative likehood of retention for females and males, respectively, for O negative blood group compared with all other blood groups as reference,
-(e,f)&nbsp;Relative likehood of retention for females and males, respectively, in age of at most 20 years at donation, 
+(c,d)&nbsp;Hazard/return ratio for females and males, respectively, for O negative blood group compared with all other blood groups as reference,
+(e,f)&nbsp;Hazard/return for females and males, respectively, in age of at most 20 years at donation, 
 compared with the reference age group of 41 to 45 years. 
 (g,h)&nbsp;Similarly for bottom decile of hemoglobin surplus (excess to threshold) with the mid-50% fractile as reference.
 (i)&nbsp;Similarly for males, with females as reference group, 
-(j)&nbsp;example (Finnish females) of relative likelihoods of retention for age groups (at donation), with 41 to 45 as reference,
-(k,l)&nbsp;relative likelihood of retention for females and males, for different blood establishments (Australia as reference)"
+(j)&nbsp;example (Finnish females) of hazard/return ratios for age groups (at donation), with 41 to 45 as reference,
+(k,l)&nbsp;hazard/return ratio for females and males, for different blood establishments (Australia as reference)"
 
 html.file=sub('¤table¤',paste(html.table.s,if(include.captions) captions$figure.s else '',sep='\n'),html.template)
 convertOutput(html.file,file=paste0(param$shared.dir,'figure-s relative survival.html'))
@@ -223,7 +244,7 @@ html.table.s1='<table><tr>
 <td><img width=500 src="../results/survival-joint-bloodgr-Female-NA.png"></td>
 <td><img width=500 src="../results/survival-joint-bloodgr-Male-NA.png"></td> </tr><tr>
 
-<td colspan="2">(b) Relative to O-donors: females on left, males on right </td>  </tr><tr>
+<td colspan="2">(b) O- donors relative to other (non-O-) donors: females on left, males on right </td>  </tr><tr>
 
 <td><img width=500 src="../results/survival-joint-age.group.t-Female--15-20-.png"></td>
 <td><img width=500 src="../results/survival-joint-age.group.t-Male--15-20-.png"></td> </tr><tr>
@@ -256,23 +277,24 @@ html.table.s2='<table><tr>
 # <td>(i)</td>
 # <td>(j)</td> </tr><tr>
 
-captions$figure.s1="<b>Figure 1</b> Relative retention by various groupings as a function of the number of donation with 
-confidence intervals (dashed). A value above the horizontal dashed line marking relative retention equals 1 implies 
-that the group is more likely to return than the reference group. See panel legends for group variables and reference groups."
+captions$figure.s1="<b>Figure 1</b> Hazard/return ratios by various groupings as a function of the number of donation with 
+confidence intervals (dashed). A value above the horizontal dashed line marking hazard/return ratio = 1 implies 
+that the group is more likely to return than the reference group: as an example, a hazard/return ration 1.5 implies that the group is 50% more likely to return than the reference group. 
+See panel legends for group variables and reference groups."
 
-# (a)&nbsp;Relative likelikelihood of next donation after the second etc. donation compared with after the first donation for females and males.
-# (b)&nbsp;Relative likehood of retention for females and males, respectively, for O negative blood group compared with all other blood groups as reference,
-# (c)&nbsp;Relative likehood of retention for females and males, respectively, in age of at most 20 years at donation, 
+# (a)&nbsp;Hazard/return ratio after the second etc. donation compared with after the first donation for females and males.
+# (b)&nbsp;Hazard/return ratio for females and males, respectively, for O negative blood group compared with all other blood groups as reference,
+# (c)&nbsp;Hazard/return ratio for females and males, respectively, in age of at most 20 years at donation, 
 # compared with the reference age group of 41 to 45 years. 
 # (d)&nbsp;Similarly for bottom decile of hemoglobin surplus (excess to threshold) with the mid-50% fractile as reference.
 # "
 
 # captions$figure.s2="<b>Figure S2</b> (a)&nbsp;Similarly for males, with females as reference group, 
-# (b)&nbsp;example (Finnish females) of relative likelihoods of retention for age groups (at donation), with 41 to 45 as reference,
-# (c)&nbsp;relative likelihood of retention for females and males, for different blood establishments (Australia as reference)"
+# (b)&nbsp;example (Finnish females) of hazard/return ratios for age groups (at donation), with 41 to 45 as reference,
+# (c)&nbsp;hazard/return ratio for females and males, for different blood establishments (Australia as reference)"
 
-captions$figure.s2="<b>Figure 2</b> Relative retention by various groupings as a function of the number of donation with 
-confidence intervals (dashed). A value above the horizontal dashed line marking relative retention equals 1 implies 
+captions$figure.s2="<b>Figure 2</b> Hazard/return ratios by various groupings as a function of the number of donation with 
+confidence intervals (dashed). A value above the horizontal dashed line marking hazard/ratio ratio = 1 implies 
 that the group is more likely to return than the reference group. See panel legends for more details."
 
 
@@ -461,3 +483,7 @@ stats.ord %>%
 stats.ord %>%
 # 	group_by(country,sex,var) %>%
 	summarise(value=sum(n),.groups='drop')
+
+lapply(captions,function(x))
+html.file.captions=sub('¤table¤',,html.template)
+cat(html.file.1s,file=paste0(param$shared.dir,'table-1 survival.html'))

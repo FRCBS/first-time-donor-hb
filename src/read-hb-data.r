@@ -350,8 +350,6 @@ for (nm in names(margins)) {
 
 	rlist=by(df,df[,c('sex','country')],function(x) {
 		# 2026-05-24 Handle the case that hourly data is missing
-bsAssign('x')
-# error(110)
 		colnames(x)=sub(nm,'level',colnames(x))
 
 		if (length(table(x[[nm]])) == 1) 
@@ -376,16 +374,6 @@ bsAssign('x')
 
 		# nb! This should be converted to the new style as well
 		# Predict and the computation based on tv seem to give the same results
-if (FALSE) {
-	m=lm(mean~age+0,weights=n,data=x)
-	sm=summary(m)
-	new.data=unique(x$age)
-	df0=data.frame(predict(m,data.frame(age=new.data),interval='confidence'))
-	df0$age=new.data
-	df0
-}
-		# df=data.frame(sm$coeff)
-		# tv=-qt(0.025,df=sm$df[2])
 		df=data.frame(country=x$country[1],sex=x$sex[1],var=nm,mean0) %>%
 			inner_join(sd.mean,join_by(level))
 		df$std.err=df$sd/sqrt(df$n2)
@@ -404,7 +392,6 @@ if (FALSE) {
 		return(df)
 	})
 	var.data=do.call(rbind,rlist)
-bsAssign('var.data')
 
 	# 2026-05-27 conversions done here as well
 	for (cn in names(conversions)) {
@@ -439,9 +426,11 @@ bsAssign('var.data')
 				filename=gsub('[](%,]','_',subFromList(file.pattern,param))
 				local.plot=TRUE
 
-				pdf(filename,width=7,height=if(var.name=='hb.dev') 5 else 5-(63-51)/25.4)
+				pdf(filename,width=7,height=0.75 * if(var.name=='hb.dev') 5 else 5-(63-51)/25.4)
+print(margins)
 				par(mar=margins) # no space at the top; bottom,left,top,right bottom 2.2->0
-				par(cex=1.25,cex.axis=1.25,cex.lab=1.25)
+				cex0=1.2 # 1.25
+				par(cex=cex0,cex.axis=cex0,cex.lab=cex0)
 				main=''
 			}
 
@@ -483,12 +472,13 @@ bsAssign('var.data')
 		})
 	} # plotCommon
 
-	plotCommon('hb.dev',margins=c(4.1,4.1,.1,0.1))
+	plotCommon('hb.dev',margins=c(2.1,4.1,.1,0.1)) # 2026-09-30
 	plotCommon('hb.mean',margins=c(0.4,4.1,.1,0.1))
 
 	mar.res[[nm]]=var.data
 }
 dev.off() # margins.pdf
+# convertOutput(html.file,file=paste0(param$shared.dir,'figure-hb-2 levels margins.html'))
 
 # 2026-06-06 In the large scale, above happens the estimation: margins -> crtn
 # margins + annual.hb -> hb.dev~level -> crtn (country,sex,var,level + estimates)
@@ -549,14 +539,15 @@ par(mar=c(4,4,0.5,0.6)) # no space at the top; bottom,left,top,right bottom 2.2-
 # sms=plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb'),colours=colours,colour.col='country',trends='table',legend.position='left')
 sms=plotByGroups(hb.cmp,group.cols=c('sex','country'),xcol='year',ycols=c('hb','lower','upper'),colours=colours,colour.col='country',trends='table',legend.position='left',draw.confint=TRUE)
 dev.off()
-
+	
 trends.table = sms %>% 
 	filter(par=='hb') %>%
 	rowwise() %>%
 	mutate(corrected=sub('^..','',sub('-corrected','yes',country))) %>%
 	mutate(country=sub('-corrected','',country)) %>%
+	mutate(corrected=sub('^$','no',corrected)) %>%
 	# rename(p.value=Pr...t.) %>%
-	dplyr::select(country,sex,corrected,Estimate,p.value) %>%
+	dplyr::select(country,sex,corrected,Estimate,Std..Error,p.value) %>%
 	mutate(p.value=round(p.value,4)) %>%
 	arrange(desc(corrected)) %>%
 	mutate(country=cn.names[[country]])
@@ -565,6 +556,8 @@ wh=which(trends.table$p.value<0.05)
 if (length(wh) > 0) {
 	trends.table$p.value[wh]=paste0('¤',trends.table$p.value[wh],'%')
 }
+
+colnames(trends.table)=c('Blood establishment','Sex','Corrected','Estimate','Std. error','p-value')
 
 html.table=paste(capture.output(print(xtable(trends.table,digits=5),type='html',include.rownames=FALSE)),collapse='\n')
 html.table=gsub('¤([^%]+)%','<b>\\1</b>',html.table)
@@ -676,6 +669,8 @@ by(lbc,lbc$value.country,function(x) {
 	if (nrow(x) == 1)
 		return(NULL)
 
+bsAssign('x')
+
 	cn=x$value[1]
 
 	y0=min(x$y)
@@ -684,12 +679,42 @@ by(lbc,lbc$value.country,function(x) {
 		filter(x>1)
 	x$x=x$x-1
 
-	col.widths.sg=col.widths[-1]
+x %>%
+	group_by(x) %>%
+	summarise(example=min(value))
 
-	pdf(paste0('results/heatmap-',cn,'.pdf'),height=max(x$y)*5/25.4,width=6)
+	col.widths.sg=col.widths[-c(1,2,7)] # -1
+	# col.widths.sg[c(2,7)] = 0
+
+	old.x=unique(x$x)
+	new.x=old.x
+	wh=which(!old.x%in%c(2,7))
+	x0=data.frame(x0=old.x)
+	x1=data.frame(x1=wh)
+	x.cmb=inner_join(x0,x1,join_by(x$x0==y$x1)) %>%
+		mutate(converted=row_number())
+	x=x %>%
+		inner_join(x.cmb,join_by(x$x==y$x0)) %>%
+		dplyr::select(-x) %>%
+		rename(x=converted)
+
+	# inner_join(data.frame(x=old.x),data.frame(x=new.x),join_by(x))
+
+bsAssign('col.widths.sg')
+col.widths.sg
+
+	# x=x %>% filter(!x %in% c(2,7))
+
+	pdf(paste0('results/heatmap-',cn,'.pdf'),height=max(x$y)*5/25.4,width=4)
 	par(mar=c(0.1,1,0.0,0.0)) # bottom,left,top,right bottom 2.2->0
 	par(mai=c(0,0,0,0))
-	plot(NULL,xlim=c(0,sum(col.widths.sg)),ylim=rev(c(1-0.5,max(x$y)+0.5)),axes=FALSE,xaxs = "i",yaxs = "i")
+	plot(NULL,xlim=c(0,sum(col.widths.sg)),ylim=rev(c(-1+(1-0.5),max(x$y)+0.5)),axes=FALSE,xaxs = "i",yaxs = "i")
+	# text((1-ha)*etd.by$x0+ha*etd.by$x1,etd.by$y,labels=etd.by$value,cex=0.75,font=etd.by$font[1]) # 1 
+	text(3,0,'Female',font=2,cex=0.85)
+	text(7,0,'Male',font=2,cex=0.85)
+	y0=0.40
+	lines(c(1.1,4.9),c(y0,y0),lwd=1.5)
+	lines(c(5.1,8.9),c(y0,y0),lwd=1.5)
 	plot.et.data(x,col.widths.sg,hadj=0.5)
 	dev.off()
 })
