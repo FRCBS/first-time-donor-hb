@@ -328,8 +328,8 @@ html.table.c='<table><tr>
 
 frml.latex='$S(t)=a+(R_0–a)\\cdot \\exp\\{–\\exp(lrc)\\cdot \\sqrt{t}\\}$'
 frml.html='S(t)=a+(R<sub>0</sub>–a)·exp{–exp(lrc)·sqrt(t)}'
-captions$figure.c="<b>Figure 3</b> Survival as a function of time for (a)&nbsp;1 and 
-(b)&nbsp;16 previous donations. Data for females on the left and males on the right. Top row: retention after
+captions$figure.c="<b>Figure 3</b> Retention as a function of time for (a)&nbsp;1 and 
+(b)&nbsp;16 or more previous donations. Data for females on the left and males on the right. Top row: retention after
 first donation. Second row: retention after 16 or more donations. Legend for colours in bottom row. While there are significant differences 
 between blood establishments in retention after first donation, the differences tend to vanish with 
 increasing number of donations. This phenomenon can also be seen from the parameter estimates at the bottom 
@@ -474,7 +474,6 @@ cat(html.file.1s,file=paste0(param$shared.dir,'table-1 hb.html'))
 # hb
 stats.annual.hb %>% summarise(sum(n))
 
-
 stats.ord %>%
 	# group_by(country,sex,var) %>%
 	filter(ord==1) %>%
@@ -484,6 +483,7 @@ stats.ord %>%
 # 	group_by(country,sex,var) %>%
 	summarise(value=sum(n),.groups='drop')
 
-lapply(captions,function(x))
-html.file.captions=sub('¤table¤',,html.template)
-cat(html.file.1s,file=paste0(param$shared.dir,'table-1 survival.html'))
+list.of.legends=paste(sapply(sort(names(captions)),FUN=function(x) captions[[x]]),sep='\n<br><br>')
+html.file=sub('¤table¤',paste0('<h2>Figure legends</h2>','\n',paste(list.of.legends,collapse='\n<p>')),html.template)
+# cat(html.file)
+cat(html.file,file=paste0(param$shared.dir,'list of legends.html'))
